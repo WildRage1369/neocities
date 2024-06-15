@@ -137,6 +137,7 @@ function insertWindow(dirname) {
 			$(event.target)
 				.parent(".window")
 				.each((i, e) => {
+					i++ // supresses warning
 					if ($(e).css("left") == "9999px") {
 						$(e).css("left", dim[0] / 2 - parseInt($(e).css("width")) / 2);
 						$(e).css("top", dim[1] / 2 - parseInt($(e).css("height")) / 2);
