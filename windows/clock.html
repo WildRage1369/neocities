@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="https://unpkg.com/98.css">
+    <link href="windows.css" rel="stylesheet" type="text/css" media="all">
+    <script src="https://code.jquery.com/jquery-3.7.1.js"
+            integrity="sha256-eKhayi8LEQwp4NKxN+CfCh+3qOVUtJn3QNZ0TciWLP4="
+            crossorigin="anonymous"></script>
+</head>
+<div class="text-card">
+    <p class="current-date">Thur Jan 01 1970</p>
+    <p class="current-time">00:00:00</p>
+    <script>
+				function setClock() {
+					let dte = new Date();
+					let hrs = (dte.getHours()+11)%12+1;
+					let ampm = (dte.getHours()/12)?"PM":"AM";
+					let min = ("0"+dte.getMinutes()).slice(-2);
+					let sec = ("0"+dte.getSeconds()).slice(-2);
+					$(".current-date").html(
+						`<p class="current-date">${dte.toDateString()}</p>`
+					);
+					$(".current-time").html(
+						`<p class="current-time">${hrs}:${min}:${sec} ${ampm}</p>`
+					);
+				};
+				setClock();
+				setInterval(setClock, 1000);
+    </script>
+</div>

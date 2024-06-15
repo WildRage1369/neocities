@@ -1,0 +1,101 @@
+/* --- All Windows --- */
+
+body, html {
+	margin: 0px;
+	width: 100%;
+	font-family: "Pixelated MS Sans Serif",Arial;
+}
+
+p { margin-bottom: 0px; } /* all paragraphs */
+
+/* all links */
+a { color: #7ad14f }
+
+.text-link {
+	color: #35671c;
+	text-decoration-line: underline;
+}
+/* a:visited { color: #35671c} */
+
+img {
+	max-width: 100%;
+	max-height: 1000px;
+	pointer-events: none;
+}
+
+.unselectable {
+	-moz-user-select: -moz-none;
+    -khtml-user-select: none;
+    -webkit-user-select: none;
+    -o-user-select: none;
+    user-select: none;
+}
+
+/* --- Text Windows --- */
+
+.text-card {
+	height: min-content;
+	padding: 10px 2px;
+	font-size: calc(20px + 1.5vh);
+	text-align: center;
+	overflow-y: auto;
+}
+
+.scroller {
+	height: 500px ;
+}
+
+/* --- Pronouns Window --- */
+
+.pronouns {
+	display: grid;
+	grid: 		
+	'title title'
+	'label range'
+	'label range'
+	'label range'
+	'label range';
+}
+
+#range26 {
+	pointer-events: none;
+	grid-area: range;
+}
+
+label[for=range25] {
+	padding-left: 2px;
+	white-space: nowrap;
+	font-size: 18px;
+	grid-area: label;
+}
+label[for=range26] {
+	font-size: 16px;
+}
+label[for=range27] {
+	font-size: 16px;
+}
+
+
+/* --- Clock Window --- */
+
+.current-date, .current-time {
+	font-size: calc(24px + 6vh);
+	margin: 10px;
+}
+
+/* --- Terminal Window --- */
+
+#shell {
+	background-color: black;
+	color: white;
+	font-size: 16px;
+	resize: none;
+}
+
+/* --- Jukebox Window --- */
+
+.progress-bar {
+	margin: 10px;
+	width: 90%
+}
+

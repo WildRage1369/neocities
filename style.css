@@ -1,0 +1,164 @@
+body,
+html {
+	background: #ffffff url('images/N5.png') no-repeat fixed 75% 25%;
+	background-size: cover;
+	font-family: "Pixelated MS Sans Serif", Arial;
+	height: 100%;
+	width: 100%;
+	color: black;
+	padding: 0px;
+	margin: 0px;
+	overflow: hidden;
+	font-size: 18px;
+}
+
+body {
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+	
+}
+
+iframe {
+	border: none;
+	width: 100%;
+	margin: 0px;
+	padding: 0px;
+	overflow: visible;
+}
+
+img {
+	max-width: 100%;
+	max-height: 100%;
+	pointer-events: none;
+}
+
+/* --- taskbar style --- */
+#taskbar {
+	box-sizing: border-box;
+	min-height: 40px;
+	height: 2vw;
+	width: 100%;
+
+	background: silver;
+	box-shadow: inset -1px -1px #0a0a0a,inset 1px 1px #dfdfdf,inset -2px -2px grey,inset 2px 2px #fff;
+	padding: 6px 9px;
+
+	display: flex;
+	justify-content: space-between;
+}
+
+#taskbar-left, #taskbar-right {
+	display: flex;
+	/* height: 100%; */
+}
+#taskbar-right {
+	justify-content: flex-end;
+}
+
+.taskbar-button {
+	width: min-content;
+	padding: 0px 6px;
+	min-width: 35px;
+}
+
+#home-button {
+	height: 100%;
+	min-height: 16px;
+	width: min-content;
+	display: flex;
+	align-content: flex-start;
+  	padding: 3px;
+	gap: 5px;
+}
+
+.taskbar-icon:active {
+	transform: translate(2px,2px)
+}
+.button-text {
+	font-size: 18px;
+	margin-top: 3px;
+	max-width: 100%;
+	max-height: 100%;
+	text-align: left;
+}
+
+.button-text:active { transform: none; }
+
+/* taskbar window button */
+.window-button {
+	width: 100px;
+	padding: 0px 6px;
+	text-wrap: nowrap;
+	overflow: clip;
+}
+
+/* --- desktop style --- */
+.container {
+	width: 100%;
+	padding: 0px;
+	overflow: hidden;
+
+	display: flex;
+	flex-direction: column;
+	flex-wrap: wrap;
+	align-content: flex-start;
+}
+
+.desktop-icon {
+	width: 64px;
+	height: min-content;
+
+	-webkit-filter: invert(1);
+	filter: invert(1) drop-shadow(1px 1px 1px);
+	margin-left: 20px;
+	margin-top: 15px
+}
+
+.desktop-text {
+	margin-top: 0px;
+	margin-bottom: 0px;
+}
+
+/* --- window style --- */
+.unselectable {
+	-moz-user-select: -moz-none;
+    -khtml-user-select: none;
+    -webkit-user-select: none;
+    -o-user-select: none;
+    user-select: none;
+}
+.window {
+	top:9999px;
+	left:9999px;
+	height: max-content;
+	position: absolute;
+	overflow: scroll;
+	resize: both;
+}
+.title-bar {
+	background: linear-gradient(90deg, #14500b, #2f7d24);
+	font-size: 14px;
+	white-space: nowrap;
+	overflow: hidden;
+	grid-area: title;
+}
+
+.site-icon {
+	height: 2vh;
+}
+
+.title-bar-controls, .title-bar {
+	height: 16px;
+}
+
+/* --- window sizes --- */
+.abtme-win {min-width:400px;}
+.jukebox-win {min-width:280px;}
+.abtsite-win {min-width:420px;}
+.links-win {min-width:300px;}
+.pronouns-win {min-width:300px;}
+#pictures {min-width:300px; width:50vw; max-width:1000px;}
+.clock-win {min-width:230px;}
+#blogs {min-width:200px;}
+#why-n {min-width:550px; width:60vw;}

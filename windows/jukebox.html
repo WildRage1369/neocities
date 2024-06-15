@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="https://unpkg.com/98.css">
+    <link href="windows.css" rel="stylesheet" type="text/css" media="all">
+    <script src="https://code.jquery.com/jquery-3.7.1.js"
+            integrity="sha256-eKhayi8LEQwp4NKxN+CfCh+3qOVUtJn3QNZ0TciWLP4="
+            crossorigin="anonymous"></script>
+</head>
+<div class="text-card">
+    <p class="song-name">Song Name</p>
+    <div class="field-row progress-bar">
+        <label class="current-time" for="range26">00:00</label>
+        <input class="song-bar" id="range26" type="range" min="0" max="1" value="0" />
+        <label class="total-time" for="range27">00:00</label>
+    </div>
+    <div class="buttons">
+        <button id="back">&lt;</button>
+        <button id="playpause">#</button>
+        <button id="next">&gt;</button>
+    </div>
+    <audio preload="metadata">
+        <source src="https://crowconclave.dev/11%20-%20N%27s%20Castle.mp3"
+                type="audio/mp3">
+    </audio>
+</div>
+<script src="jukebox.js"></script>
