@@ -44,7 +44,7 @@ function insertWindow(dirname) {
 		</div>`
 	// <button id=taskbar-${dirname} type="button" class="window-button">
 	let taskbar_html = `
-		<button id="bar-${wid}" type="button" class="window-button">
+		<button id="bar-${wid}" type="button" class="window-button taskbar-button">
 			<p id="par-${wid}" class="button-text">${title}</p>
 		</button>`
 
