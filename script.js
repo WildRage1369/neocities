@@ -34,7 +34,7 @@ function insertWindow(dirname) {
 	let window_html = `
 		<div class="window ${dirname}-win" id="win-${wid}">
 		<div class="title-bar">
-			<div class="title-bar-text">${title}</div>
+			<div class="title-bar-text unselectable">${title}</div>
 			<div class="title-bar-controls">
 				<button id="min-${wid}" aria-label="Minimize"></button>
 				<button id="cls-${wid}" aria-label="Close"></button>
