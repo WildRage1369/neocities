@@ -12,6 +12,7 @@ var titles = [
 	["blogs", "My Blog Posts"],
 	["clock", "Clock"],
 	["why-n", "Why N?"],
+	["buttons", "Buttons!"],
 ];
 
 
