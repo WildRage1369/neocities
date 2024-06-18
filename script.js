@@ -5,7 +5,7 @@ var titles = [
 	["abtme", "About Me!"],
 	["abtsite", "About My Site!"],
 	["links", "My Links!"],
-	["pronouns", "My Pronouns!"],
+	["pronouns", "My Pronoun Prefrence!"],
 	["pictures", "N <3 <3"],
 	["jukebox", "Jukebox"],
 	["terminal", "Terminal"],
