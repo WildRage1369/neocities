@@ -28,7 +28,7 @@
                     <p class="desktop-text unselectable">About Site</p>
                 </center>
             </div>
-			<div class="desktop-icon icon-pronouns"
+            <div class="desktop-icon icon-pronouns"
                  id="pronoun-area"
                  ondblclick="insertWindow('pronouns')">
                 <img class="unselectable" src="images/window.png" alt="Window icon">
@@ -76,7 +76,7 @@
                     <p class="desktop-text unselectable">Terminal</p>
                 </center>
             </div>
-			<div class="desktop-icon icon-blogs"
+            <div class="desktop-icon icon-blogs"
                  id="blogs-area"
                  ondblclick="insertWindow('blogs')">
                 <img class="unselectable" src="images/file.png" alt="File Icon">
@@ -84,7 +84,7 @@
                     <p class="desktop-text unselectable">My Blog</p>
                 </center>
             </div>
-			<div class="desktop-icon icon-buttons"
+            <div class="desktop-icon icon-buttons"
                  id="buttons-area"
                  ondblclick="insertWindow('buttons')">
                 <img class="unselectable" src="images/floppy.png" alt="Floppy Disk Icon">
@@ -93,19 +93,23 @@
                 </center>
             </div>
         </div>
-		<div id="taskbar" style="z-index:99;">
-			<div id="taskbar-left">
-				<button type="button" id="home-button">
-					<img class="taskbar-icon" src="images/98.png" alt="Windows 98 logo" style="width: 25px; height:21px;">
-					<p class="button-text">Start</p>
-				</button>
-			</div>
-			<div id="taskbar-right" >
-				<button type="button" class="taskbar-button">
-					<img class="taskbar-icon" src="images/music.png" alt="Music note icon">
-				</button>
-			</div>
-		</div>
+        <div id="taskbar" style="z-index:99;">
+            <div id="taskbar-left">
+                <button type="button" id="home-button">
+                    <img class="taskbar-icon"
+                         src="images/98.png"
+                         alt="Windows 98 logo"
+                         style="width: 25px;
+                                height:21px">
+                    <p class="button-text">Start</p>
+                </button>
+            </div>
+            <div id="taskbar-right">
+                <button type="button" class="taskbar-button">
+                    <img class="taskbar-icon" src="images/music.png" alt="Music note icon">
+                </button>
+            </div>
+        </div>
         <script src="script.js" defer></script>
     </body>
 </html>
