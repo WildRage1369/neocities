@@ -1,127 +1,127 @@
 body,
 html {
-	background: #fff url('images/N5.png') no-repeat fixed 75% 25%;
-	background-size: cover;
-	font-family: "Pixelated MS Sans Serif", Arial;
-	height: 100%;
-	width: 100%;
-	color: black;
-	padding: 0;
-	margin: 0;
-	overflow: hidden;
-	font-size: 18px;
+    background: #fff url('images/N5.png') no-repeat fixed 75% 25%;
+    background-size: cover;
+    font-family: "Pixelated MS Sans Serif", Arial;
+    height: 100%;
+    width: 100%;
+    color: black;
+    padding: 0;
+    margin: 0;
+    overflow: hidden;
+    font-size: 18px;
 }
 
 body {
-	display: flex;
-	flex-direction: column;
-	justify-content: space-between;
-	
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+
 }
 
 iframe {
-	border: none;
-	width: 100%;
-	margin: 0;
-	padding: 0;
-	overflow: visible;
+    border: none;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
 }
 
 img {
-	max-width: 100%;
-	max-height: 100%;
-	pointer-events: none;
+    max-width: 100%;
+    max-height: 100%;
+    pointer-events: none;
 }
 
 /* --- taskbar style --- */
 #taskbar {
-	box-sizing: border-box;
-	min-height: 40px;
-	height: 2vw;
-	width: 100%;
-	background: silver;
-	box-shadow: inset -1px -1px #0a0a0a,inset 1px 1px #dfdfdf,inset -2px -2px grey,inset 2px 2px #fff;
-	padding: 6px 9px;
-	display: flex;
-	justify-content: space-between;
+    box-sizing: border-box;
+    min-height: 40px;
+    height: 2vw;
+    width: 100%;
+    background: silver;
+    box-shadow: inset -1px -1px #0a0a0a,inset 1px 1px #dfdfdf,inset -2px -2px grey,inset 2px 2px #fff;
+    padding: 6px 9px;
+    display: flex;
+    justify-content: space-between;
 }
 
 #taskbar-left, #taskbar-right {
-	display: flex;
+    display: flex;
 
-	/* height: 100%; */
+    /* height: 100%; */
 }
 
 #taskbar-right {
-	justify-content: flex-end;
+    justify-content: flex-end;
 }
 
 .taskbar-button {
-	width: min-content;
-	padding: 0 6px;
-	min-width: 35px;
+    width: min-content;
+    padding: 0 6px;
+    min-width: 35px;
 }
 
 #home-button {
-	height: 100%;
-	min-height: 16px;
-	width: min-content;
-	display: flex;
-	align-content: flex-start;
-  	padding: 3px;
-	gap: 5px;
+    height: 100%;
+    min-height: 16px;
+    width: min-content;
+    display: flex;
+    align-content: flex-start;
+    padding: 3px;
+    gap: 5px;
 }
 
 .taskbar-icon:active {
-	transform: translate(2px,2px)
+    transform: translate(2px,2px)
 }
 
 .button-text {
-	font-size: 18px;
-	margin-top: 3px;
-	max-width: 100%;
-	max-height: 100%;
-	text-align: left;
+    font-size: 18px;
+    margin-top: 3px;
+    max-width: 100%;
+    max-height: 100%;
+    text-align: left;
 }
 
 .button-text:active { transform: none; }
 
 /* taskbar window button */
 .window-button {
-	width: 100px;
-	padding: 0 6px;
-	text-wrap: nowrap;
-	overflow: clip;
+    width: 100px;
+    padding: 0 6px;
+    text-wrap: nowrap;
+    overflow: clip;
 }
 
 /* --- desktop style --- */
 .container {
-	width: 100%;
-	padding: 0;
-	overflow: hidden;
-	display: flex;
-	flex-flow: column wrap;
-	align-content: flex-start;
+    width: 100%;
+    padding: 0;
+    overflow: hidden;
+    display: flex;
+    flex-flow: column wrap;
+    align-content: flex-start;
 }
 
 .desktop-icon {
-	width: 64px;
-	height: 110px;
-	filter: invert(1);
-	filter: invert(1) drop-shadow(1px 1px 1px);
-	margin-left: 20px;
-	margin-top: 15px;
-	margin-right: 10px;
+    width: 64px;
+    height: 110px;
+    filter: invert(1);
+    filter: invert(1) drop-shadow(1px 1px 1px);
+    margin-left: 20px;
+    margin-top: 15px;
+    margin-right: 10px;
 }
 
 .desktop-text {
-	margin-top: 0;
-	margin-bottom: 0;
+    margin-top: 0;
+    margin-bottom: 0;
 }
 
 /* --- window style --- */
 .unselectable {
-	user-select: -moz-none;
+    user-select: -moz-none;
     user-select: none;
     user-select: none;
     user-select: none;
@@ -129,30 +129,36 @@ img {
 }
 
 .window {
-	top:9999px;
-	left:9999px;
-	height: max-content;
+    top:9999px;
+    left:9999px;
+    height: max-content;
     min-height: 25px;
     min-width: 250px;
-	position: absolute;
-	overflow: scroll;
-	resize: both;
+    position: absolute;
+    overflow: hidden;
+    resize: both;
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+}
+.window::-webkit-scrollbar {
+    width: 0px;
+    background: transparent; /* make scrollbar transparent */
 }
 
 .title-bar {
-	background: linear-gradient(90deg, #14500b, #2f7d24);
-	font-size: 14px;
-	white-space: nowrap;
-	overflow: hidden;
-	grid-area: title;
+    background: linear-gradient(90deg, #14500b, #2f7d24);
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    grid-area: title;
 }
 
 .site-icon {
-	height: 2vh;
+    height: 2vh;
 }
 
 .title-bar-controls, .title-bar {
-	height: 16px;
+    height: 16px;
 }
 
 /* --- window sizes --- */

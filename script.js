@@ -165,7 +165,6 @@ function insertWindow(dirname) {
                 if(!mouseUp) {
                     if (counter == 0) {
                         timer_id = setTimeout(() => {
-                            console.log("resizeIframe");
                             toFront(win.wid);
                             resizeIframeForResize(win.jqWin);
                             counter = 0;
@@ -243,27 +242,15 @@ function resizeIframeForResize(obj) {
     $(obj)
         .children("iframe")
         .css(
-            "height",
-            ($(obj).css("height") - 25),
-        );
-    $(obj)
-        .children("iframe")
-        .css(
             "width",
             $(obj).css("width"),
         );
-
+    let calc_height = (Number($(obj).css("height").slice(0, -2)) - 25) + "px"
     $(obj)
         .children("iframe")
         .css(
             "height",
-            $(obj).children("iframe").contents().find("body").css("height"),
-        );
-    $(obj)
-        .children("iframe")
-        .css(
-            "width",
-            $(obj).children("iframe").contents().find("body").css("width"),
+            calc_height,
         );
 }
 
