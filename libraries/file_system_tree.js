@@ -25,7 +25,7 @@ class FileSystemTree {
 		root.addChildList(root_children);
 	}
 
-    // @returns serial number pre-incremented
+	// @returns serial number pre-incremented
 	getSerialNum() {
 		return this.#serial_number_counter++;
 	}
@@ -33,7 +33,7 @@ class FileSystemTree {
 	// @param file_path: string full path to file
 	// @param flags: int W_Flags
 	// @param data: string data to write
-    // @returns number of bytes written
+	// @returns number of bytes written
 	// @returns -1 if file already exists and W_Flags.EXCL is set
 	// @returns -2 if file_path is not found
 	write(file_path, flags, data) {
@@ -52,7 +52,7 @@ class FileSystemTree {
 				return -2;
 			}
 
-            // create file
+			// create file
 			dir.addChildINode(
 				new INode(
 					file_path.slice(file_path.lastIndexOf("/") + 1),
@@ -75,18 +75,18 @@ class FileSystemTree {
 			this.#file_data_map[file.serial_number] = data;
 		}
 
-        return data.length;
+		return data.length;
 	}
 
-    // @param file_path: string full path to file
-    // @returns string data read from file
-    read(file_path) {
-        let file = this.#getFile(file_path);
-        if (file == undefined) {
-            return -2;
-        }
-        return this.#file_data_map[file.serial_number];
-    }
+	// @param file_path: string full path to file
+	// @returns string data read from file
+	read(file_path) {
+		let file = this.#getFile(file_path);
+		if (file == undefined) {
+			return -2;
+		}
+		return this.#file_data_map[file.serial_number];
+	}
 
 	// returns the INode of the file located at file_path
 	// @param file_path: string
