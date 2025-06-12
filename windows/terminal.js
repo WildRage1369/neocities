@@ -1,3 +1,4 @@
+const cli = require("./cli.js");
 var shellLocation = "~";
 var shellPrompt = "N@castle:" + shellLocation + "$ ";
 var requiredText = shellPrompt;
@@ -9,6 +10,7 @@ var fs = [
 	"~/Idk/fol/",
 	"~/Idk/fol/test.txt",
 ];
+
 $("textarea").on("input", function () {
 	let val = String($(this).val());
 	if (val.indexOf(requiredText) == -1) {
@@ -27,21 +29,27 @@ $("textarea").on("input", function () {
 		} catch {
 			println(args[0] + ": command not found");
 		}
-		$(this).val($(this).val() + "\n" + shellPrompt);
+        if (window[args[0]] == "clear") {
+            $(this).val($(this).val() + "\n" + shellPrompt);
+        }
 		requiredText = $(this).val();
 	}
 });
 
+function idk(args) {
+    cpi.print("test");
+}
+
 function println(input = "") {
-	$("textarea").val($("textarea").val() + input + "\n");
+    cli.println(input);
 }
 
 function print(input) {
-	$("textarea").val($("textarea").val() + input);
+    cli.print(input);
 }
 
 function clear() {
-	$("textarea").val("");
+    cli.clear();
 }
 
 function cd(args) {
