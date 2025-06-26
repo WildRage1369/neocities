@@ -1,4 +1,5 @@
-const cli = require("./cli.js");
+import  "./cli.js";
+// const cli = require("./cli.js");
 var shellLocation = "~";
 var shellPrompt = "N@castle:" + shellLocation + "$ ";
 var requiredText = shellPrompt;

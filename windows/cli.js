@@ -10,7 +10,7 @@ function clear() {
 	$("textarea").val("");
 }
 
-module.exports = {
+export default {
 	println,
 	print,
 	clear,
