@@ -1,3 +1,4 @@
 Session.vim
 .git/
 node_modules/
+libraries/.zig-cache
