@@ -302,12 +302,16 @@ const W_Flags = enum {
 
 test "init" {
     const allocator = std.testing.allocator;
-    _ = try FileSystemTree.create(allocator);
+    const fs = try FileSystemTree.create(allocator);
+    defer fs.destroy();
+    defer allocator.destroy(fs);
 }
 
 test "write" {
     const allocator = std.testing.allocator;
     var fs = try FileSystemTree.create(allocator);
+    defer fs.destroy();
+    defer allocator.destroy(fs);
     const bytes_written = try fs.write("/tmp/test.txt", @intFromEnum(W_Flags.CREAT), "Hello There");
     try std.testing.expect(bytes_written == 12);
 }
