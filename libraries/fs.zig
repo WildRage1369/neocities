@@ -151,12 +151,18 @@ const Timestamp = struct {
     }
 };
 
+/// FileSystemTree is a file system implementation that uses a hash table to store
+/// file data. It is designed to be used in a WebAssembly environment.
+/// It is required to call .destroy() on it to free the memory
 const FileSystemTree = struct {
     root: *INode,
     file_data_map: std.AutoHashMap(usize, []const u8),
     serial_number_counter: u16 = 1,
     allocator: std.mem.Allocator,
 
+    /// Creates a new FileSystemTree (owned by the caller) and initializes it with the
+    /// root directory. The root directory is owned by the FileSystemTree and will 
+    /// deallocate it with .destroy().
     pub fn create(allocator: std.mem.Allocator) !*FileSystemTree {
         var this: *FileSystemTree = try allocator.create(FileSystemTree);
         // create root node with rwxr-xr-x perms
@@ -181,18 +187,18 @@ const FileSystemTree = struct {
         return this;
     }
 
-    // @returns serial number pre-incremented
+    /// @returns serial number pre-incremented
     fn getSerialNum(self: *FileSystemTree) u64 {
         defer self.serial_number_counter += 1;
         return self.serial_number_counter;
     }
 
-    // @param file_path: string full path to file
-    // @param flags: int W_Flags
-    // @param data: string data to write
-    // @returns number of bytes written
-    // @returns -1 if file already exists and W_Flags.EXCL is set
-    // @returns -2 if file_path is not found
+    /// @param file_path: string full path to file
+    /// @param flags: int W_Flags
+    /// @param data: string data to write
+    /// @returns number of bytes written
+    /// @returns -1 if file already exists and W_Flags.EXCL is set
+    /// @returns -2 if file_path is not found
     pub fn write(
         self: *FileSystemTree,
         file_path: []const u8,
@@ -251,15 +257,15 @@ const FileSystemTree = struct {
         return data.len;
     }
 
-    // @param file_path: string full path to file
-    // @returns string data read from file
+    /// @param file_path: string full path to file
+    /// @returns string data read from file
     pub fn read(self: *FileSystemTree, file_path: []const u8) FileOpenError!usize {
         const file = try self.getINode(file_path);
         return self.file_data_map.get(file.serial_number);
     }
 
-    // returns the INode of the file located at file_path
-    // @param file_path: string
+    /// @return returns the INode of the file located at file_path
+    /// @param file_path: string
     pub fn getINode(self: *FileSystemTree, file_path: []const u8) FileOpenError!*INode {
         var path_list = std.mem.splitScalar(u8, file_path, '/');
         var current = self.root;
@@ -281,7 +287,7 @@ const FileSystemTree = struct {
         return current;
     }
 
-    // deallocates memory the entire inode tree
+    /// deallocates memory the entire inode tree
     pub fn destroy(self: *FileSystemTree) void {
         self.root.destroy();
         self.file_data_map.deinit();
