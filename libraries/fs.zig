@@ -8,14 +8,14 @@ extern fn logErr(ptr: [*:0]const u8) void;
 fn panic(msg: []const u8, src: std.builtin.SourceLocation) noreturn {
     const string: [*:0]u8 = alloc.dupeZ(u8, msg) catch unreachable;
 
-    logErr(string);
+    if (comptime builtin.target.cpu.arch == .wasm32) logErr(string);
     var buf: [1024:0]u8 = undefined;
     var inx: usize = 0;
     std.mem.copyForwards(u8, buf[inx..], " at ");
     inx += 4;
     buf[inx + 1] = 0;
     const strings: [*:0]u8 = alloc.dupeZ(u8, buf[inx..]) catch unreachable;
-    logErr(strings);
+    if (comptime builtin.target.cpu.arch == .wasm32) logErr(strings);
     std.mem.copyForwards(u8, buf[inx..], src.file);
     inx += src.file.len;
     std.mem.copyForwards(u8, buf[inx..], ":");
@@ -48,7 +48,7 @@ var filesys: *FileSystemTree = undefined;
 // EXTERNAL: allocates memory for a string
 export fn allocString(len: usize) [*]u8 {
     const arr = alloc.alloc(u8, len + 1) catch panic("allocString() failed", @src());
-    logStr("allocString() done".ptr);
+    if (comptime builtin.target.cpu.arch == .wasm32) logStr("allocString() done".ptr);
     return arr.ptr;
 }
 
@@ -64,7 +64,7 @@ fn readString(ptr: [*:0]u8) []const u8 {
 // EXTERNAL: initializes the file system
 export fn init() void {
     filesys = FileSystemTree.create(alloc) catch panic("FileSystemTree.create() failed", @src());
-    logStr("init() done".ptr);
+    if (comptime builtin.target.cpu.arch == .wasm32) logStr("init() done".ptr);
 }
 
 // EXTERNAL: opens a file and returns a serial number
@@ -312,6 +312,7 @@ test "write" {
     var fs = try FileSystemTree.create(allocator);
     defer fs.destroy();
     defer allocator.destroy(fs);
+
     const bytes_written = try fs.write("/tmp/test.txt", @intFromEnum(W_Flags.CREAT), "Hello There");
     try std.testing.expect(bytes_written == 12);
 }
