@@ -131,9 +131,11 @@ const INode = struct {
     }
 
     pub fn destroy(self: *INode) void {
-        for (self.children) |*child| {
-            child.destroy();
+        for (self.children.items) |*child| {
+            child.*.destroy();
         }
+        self.children.deinit();
+        self.parents.deinit();
     }
 };
 
