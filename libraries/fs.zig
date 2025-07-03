@@ -303,5 +303,5 @@ test "write" {
     const allocator = std.testing.allocator;
     var fs = try FileSystemTree.create(allocator);
     const bytes_written = try fs.write("/tmp/test.txt", @intFromEnum(W_Flags.CREAT), "Hello There");
-    std.debug.assert(bytes_written == 12);
+    std.testing.expect(bytes_written == 12);
 }
