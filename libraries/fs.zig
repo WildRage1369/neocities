@@ -94,15 +94,17 @@ const INode = struct {
         children: ?std.ArrayList(*INode),
         parents: ?std.ArrayList(*INode),
     ) !*INode {
-        var this = try allocator.create(INode);
-        this.name = name;
-        this.serial_number = serial_number;
-        this.file_mode = file_mode;
-        this.owner = owner;
-        this.timestamp = timestamp;
-        this.size = size orelse 0;
-        this.children = children orelse std.ArrayList(*INode).init(allocator);
-        this.parents = parents orelse std.ArrayList(*INode).init(allocator);
+        const this = try allocator.create(INode);
+        this.* = .{
+            .name = name,
+            .serial_number = serial_number,
+            .file_mode = file_mode,
+            .owner = owner,
+            .timestamp = timestamp,
+            .size = size orelse 0,
+            .children = children orelse std.ArrayList(*INode).init(allocator),
+            .parents = parents orelse std.ArrayList(*INode).init(allocator),
+        };
         return this;
     }
 
@@ -130,9 +132,10 @@ const INode = struct {
         return self.children.length > 0;
     }
 
-    pub fn destroy(self: *INode) void {
-        for (self.children.items) |*child| {
-            child.*.destroy();
+    pub fn deallocate(self: *INode, alloc: std.mem.Allocator) void {
+        for (self.children.items) |child| {
+            child.deallocate(alloc); // recursively destroy children
+            alloc.destroy(child); // free INode memory
         }
         self.children.deinit();
         self.parents.deinit();
@@ -159,33 +162,36 @@ const Timestamp = struct {
 const FileSystemTree = struct {
     root: *INode,
     file_data_map: std.AutoHashMap(usize, []const u8),
-    serial_number_counter: u16 = 1,
+    serial_number_counter: u16,
     allocator: std.mem.Allocator,
 
     /// Creates a new FileSystemTree (owned by the caller) and initializes it with the
-    /// root directory. The root directory is owned by the FileSystemTree and will 
+    /// root directory. The root directory is owned by the FileSystemTree and will
     /// deallocate it with .destroy().
     pub fn create(allocator: std.mem.Allocator) !*FileSystemTree {
         var this: *FileSystemTree = try allocator.create(FileSystemTree);
-        // create root node with rwxr-xr-x perms
-        this.root = try INode.create(
-            allocator,
-            "/",
-            this.getSerialNum(),
-            0,
-            Timestamp.currentTime(),
-            0o755,
-            null,
-            null,
-            null,
-        );
-        this.file_data_map = std.AutoHashMap(usize, []const u8).init(allocator);
+        this.* = .{
+            .allocator = allocator,
+            .file_data_map = std.AutoHashMap(usize, []const u8).init(allocator),
+            .serial_number_counter = 1,
+            .root = try INode.create(
+                this.allocator,
+                "/",
+                this.getSerialNum(),
+                0,
+                Timestamp.currentTime(),
+                0o755,
+                null,
+                null,
+                null,
+            ),
+        };
 
         // create base directories
-        try this.root.addChildINode(try INode.create(allocator, "tmp", this.getSerialNum(), 0, Timestamp.currentTime(), 0o755, null, null, null));
-        try this.root.addChildINode(try INode.create(allocator, "home", this.getSerialNum(), 0, Timestamp.currentTime(), 0o755, null, null, null));
-        try this.root.addChildINode(try INode.create(allocator, "bin", this.getSerialNum(), 0, Timestamp.currentTime(), 0o755, null, null, null));
-        try this.root.addChildINode(try INode.create(allocator, "dev", this.getSerialNum(), 0, Timestamp.currentTime(), 0o755, null, null, null));
+        try this.root.addChildINode(try INode.create(this.allocator, "tmp", this.getSerialNum(), 0, Timestamp.currentTime(), 0o755, null, null, null));
+        try this.root.addChildINode(try INode.create(this.allocator, "home", this.getSerialNum(), 0, Timestamp.currentTime(), 0o755, null, null, null));
+        try this.root.addChildINode(try INode.create(this.allocator, "bin", this.getSerialNum(), 0, Timestamp.currentTime(), 0o755, null, null, null));
+        try this.root.addChildINode(try INode.create(this.allocator, "dev", this.getSerialNum(), 0, Timestamp.currentTime(), 0o755, null, null, null));
         return this;
     }
 
@@ -295,8 +301,13 @@ const FileSystemTree = struct {
 
     /// deallocates memory the entire inode tree
     pub fn destroy(self: *FileSystemTree) void {
-        self.root.destroy();
+        var value_iter = self.file_data_map.valueIterator();
+        while (value_iter.next()) |value| {
+            self.allocator.destroy(value);
+        }
         self.file_data_map.deinit();
+        self.root.deallocate(self.allocator);
+        self.allocator.destroy(self.root);
     }
 };
 const W_Flags = enum {
