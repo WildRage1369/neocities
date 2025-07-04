@@ -251,19 +251,18 @@ const FileSystemTree = struct {
         if (flags & @intFromEnum(W_Flags.APPEND) != 0) {
             const old_data = self.file_data_map.get(found_file.serial_number);
             if (old_data) |old| {
-                var buf = self.allocator.alloc(u8, old.len + data.len) catch unreachable;
+                var buf = self.allocator.alloc(u8, old.len + data.len+1) catch unreachable;
                 std.mem.copyForwards(u8, buf, old);
                 std.mem.copyForwards(u8, buf[old.len..], data);
+                buf[data.len + old.len] = 0;
                 try self.file_data_map.put(found_file.serial_number, buf);
             } else {
-                const buf = self.allocator.alloc(u8, data.len) catch unreachable;
-                std.mem.copyForwards(u8, buf, data);
+                const buf = self.allocator.dupe(u8, data) catch unreachable;
                 try self.file_data_map.put(found_file.serial_number, buf);
             }
         } else if (flags & @intFromEnum(W_Flags.TRUNC) != 0) {
-            const buf = self.allocator.alloc(u8, data.len) catch unreachable;
-            std.mem.copyForwards(u8, buf, data);
-            try self.file_data_map.put(found_file.serial_number, data);
+            const buf = self.allocator.dupe(u8, data) catch unreachable;
+            try self.file_data_map.put(found_file.serial_number, buf);
         }
 
         return data.len;
@@ -279,8 +278,9 @@ const FileSystemTree = struct {
     /// @return returns the INode of the file located at file_path
     /// @param file_path: string
     pub fn getINode(self: *FileSystemTree, file_path: []const u8) FileOpenError!*INode {
-        var path_list = std.mem.splitScalar(u8, file_path, '/');
+        var path_list = std.mem.splitScalar(u8, file_path, '/'); _ = path_list.first();
         var current = self.root;
+        var last_dir = self.root;
 
         // iterate through input path
         dirs: while (path_list.next()) |node_name| {
@@ -294,7 +294,11 @@ const FileSystemTree = struct {
                 current = child;
                 continue :dirs;
             }
-            return FileOpenError.FileNotFound;
+
+            if (current == last_dir) {
+                return FileOpenError.FileNotFound;
+            }
+            last_dir = current;
         }
         return current;
     }
@@ -303,7 +307,7 @@ const FileSystemTree = struct {
     pub fn destroy(self: *FileSystemTree) void {
         var value_iter = self.file_data_map.valueIterator();
         while (value_iter.next()) |value| {
-            self.allocator.destroy(value);
+            self.allocator.free(value.*);
         }
         self.file_data_map.deinit();
         self.root.deallocate(self.allocator);
@@ -320,16 +324,21 @@ const W_Flags = enum {
 test "init" {
     const allocator = std.testing.allocator;
     const fs = try FileSystemTree.create(allocator);
-    defer fs.destroy();
-    defer allocator.destroy(fs);
+    fs.destroy();
+    allocator.destroy(fs);
 }
 
 test "write" {
     const allocator = std.testing.allocator;
     var fs = try FileSystemTree.create(allocator);
-    defer fs.destroy();
-    defer allocator.destroy(fs);
+    errdefer {
+        fs.destroy();
+        allocator.destroy(fs);
+    }
 
     const bytes_written = try fs.write("/tmp/test.txt", @intFromEnum(W_Flags.CREAT), "Hello There");
-    try std.testing.expect(bytes_written == 12);
+    try std.testing.expect(bytes_written == 11);
+
+    fs.destroy();
+    allocator.destroy(fs);
 }
