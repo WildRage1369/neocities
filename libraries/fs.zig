@@ -6,7 +6,7 @@ extern fn logStr(ptr: [*:0]const u8) void;
 extern fn logErr(ptr: [*:0]const u8) void;
 
 fn panic(msg: []const u8, src: std.builtin.SourceLocation) noreturn {
-    const string: [*:0]u8 = alloc.dupeZ(u8, msg) catch unreachable;
+    const string: [*:0]u8 = wasm_alloc.dupeZ(u8, msg) catch unreachable;
 
     if (comptime builtin.target.cpu.arch == .wasm32) logErr(string);
     var buf: [1024:0]u8 = undefined;
@@ -14,7 +14,7 @@ fn panic(msg: []const u8, src: std.builtin.SourceLocation) noreturn {
     std.mem.copyForwards(u8, buf[inx..], " at ");
     inx += 4;
     buf[inx + 1] = 0;
-    const strings: [*:0]u8 = alloc.dupeZ(u8, buf[inx..]) catch unreachable;
+    const strings: [*:0]u8 = wasm_alloc.dupeZ(u8, buf[inx..]) catch unreachable;
     if (comptime builtin.target.cpu.arch == .wasm32) logErr(strings);
     std.mem.copyForwards(u8, buf[inx..], src.file);
     inx += src.file.len;
@@ -39,7 +39,7 @@ const FileOpenError = error{
     FileNotFound,
 };
 
-const alloc = if (builtin.target.cpu.arch == .wasm32) std.heap.wasm_allocator else std.testing.allocator;
+const wasm_alloc = if (builtin.target.cpu.arch == .wasm32) std.heap.wasm_allocator else std.testing.allocator;
 
 var filesys: *FileSystemTree = undefined;
 
@@ -47,7 +47,7 @@ var filesys: *FileSystemTree = undefined;
 
 // EXTERNAL: allocates memory for a string
 export fn allocString(len: usize) [*]u8 {
-    const arr = alloc.alloc(u8, len + 1) catch panic("allocString() failed", @src());
+    const arr = wasm_alloc.alloc(u8, len + 1) catch panic("allocString() failed", @src());
     if (comptime builtin.target.cpu.arch == .wasm32) logStr("allocString() done".ptr);
     return arr.ptr;
 }
@@ -55,7 +55,7 @@ export fn allocString(len: usize) [*]u8 {
 // INTERNAL: converts a wasm string pointer to a Zig string
 fn readString(ptr: [*:0]u8) []const u8 {
     const str: []const u8 = std.mem.span(ptr);
-    defer alloc.free(str);
+    defer wasm_alloc.free(str);
     return str;
 }
 
@@ -63,7 +63,7 @@ fn readString(ptr: [*:0]u8) []const u8 {
 
 // EXTERNAL: initializes the file system
 export fn init() void {
-    filesys = FileSystemTree.create(alloc) catch panic("FileSystemTree.create() failed", @src());
+    filesys = FileSystemTree.create(wasm_alloc) catch panic("FileSystemTree.create() failed", @src());
     if (comptime builtin.target.cpu.arch == .wasm32) logStr("init() done".ptr);
 }
 
@@ -250,9 +250,13 @@ const FileSystemTree = struct {
                 std.mem.copyForwards(u8, buf[old.len..], data);
                 try self.file_data_map.put(found_file.serial_number, buf);
             } else {
-                try self.file_data_map.put(found_file.serial_number, data);
+                const buf = self.allocator.alloc(u8, data.len) catch unreachable;
+                std.mem.copyForwards(u8, buf, data);
+                try self.file_data_map.put(found_file.serial_number, buf);
             }
         } else if (flags & @intFromEnum(W_Flags.TRUNC) != 0) {
+            const buf = self.allocator.alloc(u8, data.len) catch unreachable;
+            std.mem.copyForwards(u8, buf, data);
             try self.file_data_map.put(found_file.serial_number, data);
         }
 
