@@ -279,15 +279,14 @@ const FileSystemTree = struct {
     /// @return returns the INode of the file located at file_path
     /// @param file_path: string
     pub fn getINode(self: *FileSystemTree, file_path: []const u8) FileOpenError!*INode {
+        var current_node = self.root;
         var input_path_itr = std.mem.splitScalar(u8, file_path, '/');
         _ = input_path_itr.first(); // skip first element
-
-        var current_node = self.root;
 
         // iterate through input path
         while (input_path_itr.next()) |next_node_name| {
 
-            // get next node or null if not found
+            // get next node or error if not found
             const next_node: *INode = for (current_node.children.items) |child_node| {
                 if (std.mem.eql(u8, child_node.name, next_node_name)) {
                     break child_node;
@@ -295,7 +294,6 @@ const FileSystemTree = struct {
             } else return FileOpenError.FileNotFound;
 
             current_node = next_node;
-
         }
         return current_node;
     }
@@ -368,6 +366,5 @@ test "read non-existent file" {
     var fs = try FileSystemTree.create(allocator);
     defer fs.destroy();
 
-    // try std.testing.expectEqual(try fs.read("/tmp/test.txt"), "");
     try std.testing.expectError(FileOpenError.FileNotFound, fs.read("/tmp/test.txt"));
 }
