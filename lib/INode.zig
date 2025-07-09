@@ -22,7 +22,7 @@ pub const INode = struct {
     timestamp: Timestamp, // Timestamp object with ctime, mtime, atime
     size: u64,
     children: std.ArrayList(*INode),
-    parents: std.ArrayList(*INode),
+    parent: *INode,
 
     pub fn create(
         allocator: std.mem.Allocator,
@@ -33,7 +33,7 @@ pub const INode = struct {
         file_mode: u16,
         size: ?u64,
         children: ?std.ArrayList(*INode),
-        parents: ?std.ArrayList(*INode),
+        parent: ?*INode,
     ) !*INode {
         const this = try allocator.create(INode);
         errdefer allocator.destroy(this);
@@ -46,35 +46,37 @@ pub const INode = struct {
             .timestamp = timestamp,
             .size = size orelse 0,
             .children = children orelse std.ArrayList(*INode).init(allocator),
-            .parents = parents orelse std.ArrayList(*INode).init(allocator),
+            .parent = parent orelse this,
         };
         return this;
     }
 
-    // add a child INode to this INode
-    // Ownership of input INode is transferred to this INode
+    /// @brief Add a child INode to this INode and update input INode. Ownership of input INode is transferred to this INode
+    /// @param child: INode to add to this INode's children and to be owned by this INode
     pub fn addChildINode(self: *INode, child: *INode) !void {
         try self.children.append(child);
-        try child.parents.append(self);
+        child.parent = self;
     }
 
-    // add a parent INode to this INode
-    // Ownership of this INode is transferred to input INode
-    pub fn addParentINode(self: *INode, parent: *INode) !void {
-        try parent.children.append(self);
-        try self.parents.append(parent);
-    }
 
-    // add a list of children INodes to this INode
+    /// @brief Add a list of children INodes to this INode
+    /// @param new_children: ArrayList of INodes to add to this INode's children
     pub fn addChildArrayList(self: *INode, new_children: *std.ArrayList(*INode)) !void {
-        try self.children.appendSlice(try new_children.toOwnedSlice());
+        const child_slice = try new_children.toOwnedSlice();
+        try self.children.appendSlice(child_slice);
+        for (child_slice) |child| {
+            child.parent = self;
+        }
     }
 
-    // add a list of parents INodes to this INode
-    pub fn AddParentArrayList(self: *INode, new_parents: *std.ArrayList(*INode)) !void {
-        try self.parents.appendSlice(try new_parents.toOwnedSlice());
+    /// @brief Add a parent INode to this INode and update input INode. Ownership of this INode is transferred to input INode
+    /// @param parent: INode to add to this INode's parents and new owner of this INode
+    pub fn changeParent(self: *INode, parent: *INode) !void {
+        try parent.children.append(self);
+        self.parent = parent;
     }
 
+    /// @brief Check if this INode is a directory
     pub fn isDirectory(self: *INode) bool {
         return self.children.length > 0;
     }
@@ -84,7 +86,6 @@ pub const INode = struct {
             child.deallocate(alloc); // recursively destroy children
         }
         self.children.deinit();
-        self.parents.deinit();
         alloc.destroy(self);
     }
 };
@@ -107,7 +108,7 @@ test "addChildINode" {
     try inode.addChildINode(child);
 }
 
-test "addParentINode" {
+test "changeParent" {
     const allocator = std.testing.allocator;
 
     // do NOT defer as ownership is transferred to parent INode
@@ -116,7 +117,7 @@ test "addParentINode" {
     const parent = try INode.create(allocator, "parent", 1, 2, Timestamp.currentTime(), 0o755, null, null, null);
     defer parent.deallocate(allocator);
 
-    try inode.addParentINode(parent);
+    try inode.changeParent(parent);
 }
 
 // test "empty addChildArrayList" {

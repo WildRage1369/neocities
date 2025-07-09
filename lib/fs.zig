@@ -42,10 +42,10 @@ pub const FileSystemTree = struct {
         };
 
         // create base directories
-        try this.root.addChildINode(try INode.create(this.allocator, "tmp", this.getSerialNum(), 0, Timestamp.currentTime(), 0o755, null, null, null));
-        try this.root.addChildINode(try INode.create(this.allocator, "home", this.getSerialNum(), 0, Timestamp.currentTime(), 0o755, null, null, null));
-        try this.root.addChildINode(try INode.create(this.allocator, "bin", this.getSerialNum(), 0, Timestamp.currentTime(), 0o755, null, null, null));
-        try this.root.addChildINode(try INode.create(this.allocator, "dev", this.getSerialNum(), 0, Timestamp.currentTime(), 0o755, null, null, null));
+        try this.root.addChildINode(try INode.create(this.allocator, "tmp", this.getSerialNum(), 0, Timestamp.currentTime(), 0o755, null, null, this.root));
+        try this.root.addChildINode(try INode.create(this.allocator, "home", this.getSerialNum(), 0, Timestamp.currentTime(), 0o755, null, null, this.root));
+        try this.root.addChildINode(try INode.create(this.allocator, "bin", this.getSerialNum(), 0, Timestamp.currentTime(), 0o755, null, null, this.root));
+        try this.root.addChildINode(try INode.create(this.allocator, "dev", this.getSerialNum(), 0, Timestamp.currentTime(), 0o755, null, null, this.root));
         return this;
     }
 
@@ -88,7 +88,7 @@ pub const FileSystemTree = struct {
                 0o755,
                 null,
                 null,
-                null,
+                dir,
             );
             // create file
             try dir.addChildINode(file.?);
