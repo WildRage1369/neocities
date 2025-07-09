@@ -170,6 +170,8 @@ const FileSystemTree = struct {
     /// deallocate it with .destroy().
     pub fn create(allocator: std.mem.Allocator) !*FileSystemTree {
         var this: *FileSystemTree = try allocator.create(FileSystemTree);
+        errdefer allocator.destroy(this);
+
         this.* = .{
             .allocator = allocator,
             .file_data_map = std.AutoHashMap(usize, []const u8).init(allocator),
@@ -214,7 +216,7 @@ const FileSystemTree = struct {
         data: []const u8,
     ) !usize {
         //check if file exists
-        const file = self.getINode(file_path) catch null;
+        var file = self.getINode(file_path) catch null;
 
         // if file already exists and W_Flags.EXCL, error out
         if (flags & @intFromEnum(W_Flags.EXCL) != 0 and file != null) {
@@ -225,20 +227,19 @@ const FileSystemTree = struct {
         if (flags & @intFromEnum(W_Flags.CREAT) != 0 and file == null) {
             const dir = try self.getINode(file_path[0..std.mem.lastIndexOf(u8, file_path, "/").?]);
 
-            // create file
-            try dir.addChildINode(
-                try INode.create(
-                    self.allocator,
-                    file_path[std.mem.lastIndexOf(u8, file_path, "/").? + 1 ..],
-                    self.getSerialNum(),
-                    data.len,
-                    Timestamp.currentTime(),
-                    0o755,
-                    null,
-                    null,
-                    null,
-                ),
+            file = try INode.create(
+                self.allocator,
+                file_path[std.mem.lastIndexOf(u8, file_path, "/").? + 1 ..],
+                self.getSerialNum(),
+                data.len,
+                Timestamp.currentTime(),
+                0o755,
+                null,
+                null,
+                null,
             );
+            // create file
+            try dir.addChildINode(file.?);
         }
 
         if (file == null) {
@@ -251,7 +252,7 @@ const FileSystemTree = struct {
         if (flags & @intFromEnum(W_Flags.APPEND) != 0) {
             const old_data = self.file_data_map.get(found_file.serial_number);
             if (old_data) |old| {
-                var buf = self.allocator.alloc(u8, old.len + data.len+1) catch unreachable;
+                var buf = self.allocator.alloc(u8, old.len + data.len + 1) catch unreachable;
                 std.mem.copyForwards(u8, buf, old);
                 std.mem.copyForwards(u8, buf[old.len..], data);
                 buf[data.len + old.len] = 0;
@@ -270,37 +271,33 @@ const FileSystemTree = struct {
 
     /// @param file_path: string full path to file
     /// @returns string data read from file
-    pub fn read(self: *FileSystemTree, file_path: []const u8) FileOpenError!usize {
+    pub fn read(self: *FileSystemTree, file_path: []const u8) FileOpenError![]const u8 {
         const file = try self.getINode(file_path);
-        return self.file_data_map.get(file.serial_number);
+        return self.file_data_map.get(file.serial_number) orelse "FAIL";
     }
 
     /// @return returns the INode of the file located at file_path
     /// @param file_path: string
     pub fn getINode(self: *FileSystemTree, file_path: []const u8) FileOpenError!*INode {
-        var path_list = std.mem.splitScalar(u8, file_path, '/'); _ = path_list.first();
-        var current = self.root;
-        var last_dir = self.root;
+        var input_path_itr = std.mem.splitScalar(u8, file_path, '/');
+        _ = input_path_itr.first(); // skip first element
+
+        var current_node = self.root;
 
         // iterate through input path
-        dirs: while (path_list.next()) |node_name| {
+        while (input_path_itr.next()) |next_node_name| {
 
-            // search for subdirectory/file, return undefined if not found
-            children: for (current.children.items) |child| {
-                if (!std.mem.eql(u8, child.name, node_name)) {
-                    continue :children;
-                } // skip if name doesn't match
+            // get next node or null if not found
+            const next_node: *INode = for (current_node.children.items) |child_node| {
+                if (std.mem.eql(u8, child_node.name, next_node_name)) {
+                    break child_node;
+                }
+            } else return FileOpenError.FileNotFound;
 
-                current = child;
-                continue :dirs;
-            }
+            current_node = next_node;
 
-            if (current == last_dir) {
-                return FileOpenError.FileNotFound;
-            }
-            last_dir = current;
         }
-        return current;
+        return current_node;
     }
 
     /// deallocates memory the entire inode tree
@@ -312,6 +309,7 @@ const FileSystemTree = struct {
         self.file_data_map.deinit();
         self.root.deallocate(self.allocator);
         self.allocator.destroy(self.root);
+        self.allocator.destroy(self);
     }
 };
 const W_Flags = enum {
@@ -324,21 +322,52 @@ const W_Flags = enum {
 test "init" {
     const allocator = std.testing.allocator;
     const fs = try FileSystemTree.create(allocator);
-    fs.destroy();
-    allocator.destroy(fs);
+    defer fs.destroy();
 }
 
-test "write" {
+test "write only" {
     const allocator = std.testing.allocator;
     var fs = try FileSystemTree.create(allocator);
-    errdefer {
-        fs.destroy();
-        allocator.destroy(fs);
-    }
+    defer fs.destroy();
 
     const bytes_written = try fs.write("/tmp/test.txt", @intFromEnum(W_Flags.CREAT), "Hello There");
     try std.testing.expect(bytes_written == 11);
+}
 
-    fs.destroy();
-    allocator.destroy(fs);
+test "read and write" {
+    const allocator = std.testing.allocator;
+    var fs = try FileSystemTree.create(allocator);
+
+    defer fs.destroy();
+
+    const bytes_written = try fs.write("/tmp/test.txt", @intFromEnum(W_Flags.CREAT), "Hello There");
+    const bytes_read = try fs.read("/tmp/test.txt");
+
+    try std.testing.expect(bytes_written == 11);
+    try std.testing.expect(std.mem.eql(u8, bytes_read, "Hello There"));
+}
+
+test "fuzz read and write" {
+    const Context = struct {
+        fn testOne(context: @This(), input: []const u8) anyerror!void {
+            _ = context;
+            const allocator = std.testing.allocator;
+            var fs = try FileSystemTree.create(allocator);
+            defer fs.destroy();
+
+            _ = try fs.write("/tmp/test.txt", @intFromEnum(W_Flags.CREAT), input);
+            const bytes_read = try fs.read("/tmp/test.txt");
+            try std.testing.expect(std.mem.eql(u8, bytes_read, input));
+        }
+    };
+    try std.testing.fuzz(Context{}, Context.testOne, .{});
+}
+
+test "read non-existent file" {
+    const allocator = std.testing.allocator;
+    var fs = try FileSystemTree.create(allocator);
+    defer fs.destroy();
+
+    // try std.testing.expectEqual(try fs.read("/tmp/test.txt"), "");
+    try std.testing.expectError(FileOpenError.FileNotFound, fs.read("/tmp/test.txt"));
 }
