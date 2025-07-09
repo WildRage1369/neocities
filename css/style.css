@@ -1,6 +1,6 @@
 body,
 html {
-    background: #fff url('images/N5.png') no-repeat fixed 75% 25%;
+    background: #fff url('/img/N5.png') no-repeat fixed 75% 25%;
     background-size: cover;
     font-family: "Pixelated MS Sans Serif", Arial;
     height: 100%;

@@ -39,39 +39,39 @@ function changeWin() {
 	let title = $("#title-text")[0];
 
 	if (img.src.includes("N1.png")) {
-		img.src = "/images/N2.png";
+		img.src = "/img/N2.png";
 		title.text = "@meloettium";
 		title.href =
 			"https://meloettium.tumblr.com/post/700943559813152768/finersun-the-gift-of-stormdancer-edit-this-is";
 	} else if (img.src.includes("N2.png")) {
-		img.src = "/images/N3.png";
+		img.src = "/img/N3.png";
 		title.text = "@mxthrklef";
 		title.href =
 			"https://www.tumblr.com/mxthrklef/735905421180780544/redraw-from-da-gaeme";
 	} else if (img.src.includes("N3.png")) {
-		img.src = "/images/N4.png";
+		img.src = "/img/N4.png";
 		title.text = "@onionowt";
 		title.href =
 			"https://onionowt.tumblr.com/post/738787270558138368/redraw-of-an-old-art-im-talking-about-this-one";
 	} else if (img.src.includes("N4.png")) {
-		img.src = "/images/N6.png";
+		img.src = "/img/N6.png";
 		title.text = "@10domu08";
 		title.href = "https://10domu08.tumblr.com/post/189451479839";
 	} else if (img.src.includes("N6.png")) {
-		img.src = "/images/N7.png";
+		img.src = "/img/N7.png";
 		title.text = "@genlirema";
 		title.href = "https://genlirema.tumblr.com/post/737985721314476033";
 	} else if (img.src.includes("N7.png")) {
-		img.src = "/images/N8.png";
+		img.src = "/img/N8.png";
 		title.text = "@touyarokii";
 		title.href = "https://twitter.com/Touyarokii/status/1461079978456457218";
 	} else if (img.src.includes("N8.png")) {
-		img.src = "/images/N9.png";
+		img.src = "/img/N9.png";
 		title.text = "@snapling";
 		title.href =
 			"https://www.tumblr.com/snapling/740441175361830912/n-and-reshiram-doodle-i-did-a-little-bit-back-i";
 	} else if (img.src.includes("N9.png")) {
-		img.src = "/images/N1.png";
+		img.src = "/img/N1.png";
 		title.text = "@nanomias";
 		title.href =
 			"https://www.tumblr.com/nanomias/739364566303178752/n-harmonia";
