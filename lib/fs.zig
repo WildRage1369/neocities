@@ -1,165 +1,17 @@
 const std = @import("std");
 const builtin = @import("builtin");
-
-extern fn logNum(data: u32) void;
-extern fn logStr(ptr: [*:0]const u8) void;
-extern fn logErr(ptr: [*:0]const u8) void;
-
-fn panic(msg: []const u8, src: std.builtin.SourceLocation) noreturn {
-    const string: [*:0]u8 = wasm_alloc.dupeZ(u8, msg) catch unreachable;
-
-    if (comptime builtin.target.cpu.arch == .wasm32) logErr(string);
-    var buf: [1024:0]u8 = undefined;
-    var inx: usize = 0;
-    std.mem.copyForwards(u8, buf[inx..], " at ");
-    inx += 4;
-    buf[inx + 1] = 0;
-    const strings: [*:0]u8 = wasm_alloc.dupeZ(u8, buf[inx..]) catch unreachable;
-    if (comptime builtin.target.cpu.arch == .wasm32) logErr(strings);
-    std.mem.copyForwards(u8, buf[inx..], src.file);
-    inx += src.file.len;
-    std.mem.copyForwards(u8, buf[inx..], ":");
-    inx += 1;
-
-    var s = std.fmt.bufPrint(buf[inx..], "{}", .{src.line}) catch "";
-    std.mem.copyForwards(u8, buf[inx..], s);
-    inx += s.len;
-
-    s = std.fmt.bufPrint(buf[inx..], "{}", .{src.column}) catch "";
-    std.mem.copyForwards(u8, buf[inx..], s);
-    inx += s.len;
-
-    std.mem.copyForwards(u8, buf[inx..], src.fn_name);
-    inx += src.fn_name.len;
-    @trap();
-}
+const INode = @import("INode.zig").INode;
+const Timestamp = @import("INode.zig").Timestamp;
 
 const FileOpenError = error{
     AccessDenied,
     FileNotFound,
 };
 
-const wasm_alloc = if (builtin.target.cpu.arch == .wasm32) std.heap.wasm_allocator else std.testing.allocator;
-
-var filesys: *FileSystemTree = undefined;
-
-// start wasm string functions
-
-// EXTERNAL: allocates memory for a string
-export fn allocString(len: usize) [*]u8 {
-    const arr = wasm_alloc.alloc(u8, len + 1) catch panic("allocString() failed", @src());
-    if (comptime builtin.target.cpu.arch == .wasm32) logStr("allocString() done".ptr);
-    return arr.ptr;
-}
-
-// INTERNAL: converts a wasm string pointer to a Zig string
-fn readString(ptr: [*:0]u8) []const u8 {
-    const str: []const u8 = std.mem.span(ptr);
-    defer wasm_alloc.free(str);
-    return str;
-}
-
-// start OS functions
-
-// EXTERNAL: initializes the file system
-export fn init() void {
-    filesys = FileSystemTree.create(wasm_alloc) catch panic("FileSystemTree.create() failed", @src());
-    if (comptime builtin.target.cpu.arch == .wasm32) logStr("init() done".ptr);
-}
-
-// EXTERNAL: opens a file and returns a serial number
-export fn open(path_ptr: [*:0]u8) u64 {
-    const path = readString(path_ptr);
-    return (filesys.getINode(path) catch panic("FileSystemTree.getINode() failed", @src())).serial_number;
-}
-
-const INode = struct {
-    serial_number: u64,
-    name: []const u8,
-    file_mode: u16, // file permissions
-    owner: usize, // user id
-    timestamp: Timestamp, // Timestamp object with ctime, mtime, atime
-    size: u64,
-    children: std.ArrayList(*INode),
-    parents: std.ArrayList(*INode),
-
-    pub fn create(
-        allocator: std.mem.Allocator,
-        name: []const u8,
-        serial_number: u64,
-        owner: usize,
-        timestamp: Timestamp,
-        file_mode: u16,
-        size: ?u64,
-        children: ?std.ArrayList(*INode),
-        parents: ?std.ArrayList(*INode),
-    ) !*INode {
-        const this = try allocator.create(INode);
-        this.* = .{
-            .name = name,
-            .serial_number = serial_number,
-            .file_mode = file_mode,
-            .owner = owner,
-            .timestamp = timestamp,
-            .size = size orelse 0,
-            .children = children orelse std.ArrayList(*INode).init(allocator),
-            .parents = parents orelse std.ArrayList(*INode).init(allocator),
-        };
-        return this;
-    }
-
-    // add a child INode to this INode
-    pub fn addChildINode(self: *INode, child: *INode) !void {
-        return try self.children.append(child);
-    }
-
-    // add a parent INode to this INode
-    pub fn addParentINode(self: *INode, parent: *INode) !void {
-        return try self.parents.append(parent);
-    }
-
-    // add a list of children INodes to this INode
-    pub fn addChildSlice(self: *INode, new_children: std.ArrayList(*INode)) void {
-        self.children.appendSlice(new_children.toOwnedSlice());
-    }
-
-    // add a list of parents INodes to this INode
-    pub fn addParentSlice(self: *INode, new_parents: std.ArrayList(*INode)) void {
-        self.parents.appendSlice(new_parents.toOwnedSlice());
-    }
-
-    pub fn isDirectory(self: *INode) bool {
-        return self.children.length > 0;
-    }
-
-    pub fn deallocate(self: *INode, alloc: std.mem.Allocator) void {
-        for (self.children.items) |child| {
-            child.deallocate(alloc); // recursively destroy children
-            alloc.destroy(child); // free INode memory
-        }
-        self.children.deinit();
-        self.parents.deinit();
-    }
-};
-
-const Timestamp = struct {
-    ctime: i64 = 0,
-    mtime: i64 = 0,
-    atime: i64 = 0,
-
-    pub fn currentTime() Timestamp {
-        return Timestamp{
-            .ctime = 0,
-            .mtime = 0,
-            .atime = 0,
-        };
-    }
-};
-
 /// FileSystemTree is a file system implementation that uses a hash table to store
 /// file data. It is designed to be used in a WebAssembly environment.
 /// It is required to call .destroy() on it to free the memory
-const FileSystemTree = struct {
+pub const FileSystemTree = struct {
     root: *INode,
     file_data_map: std.AutoHashMap(usize, []const u8),
     serial_number_counter: u16,
@@ -306,7 +158,6 @@ const FileSystemTree = struct {
         }
         self.file_data_map.deinit();
         self.root.deallocate(self.allocator);
-        self.allocator.destroy(self.root);
         self.allocator.destroy(self);
     }
 };
