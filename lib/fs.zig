@@ -110,20 +110,8 @@ pub const FileSystemTree = struct {
 
         // create file if it doesn't exist and W_Flags.CREAT is set
         if (flags.CREAT == true and file == null) {
-            const dir = try self.getINode(file_path[0..std.mem.lastIndexOf(u8, file_path, "/").?]);
-
-            file = try INode.create(.{
-                .allocator = self.allocator,
-                .name = file_path[std.mem.lastIndexOf(u8, file_path, "/").? + 1 ..],
-                .serial_number = self.getSerialNum(),
-                .data_type = data_type,
-                .size = data.len,
-                .timestamp = Timestamp.currentTime(),
-                .parent = dir,
-            }
-            );
-            // create file
-            try dir.addChildINode(file.?);
+            self.touch(file_path, data_type);
+            file = self.getINode(file_path) catch unreachable;
         }
 
         if (file == null) {
