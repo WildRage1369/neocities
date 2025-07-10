@@ -9,6 +9,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("wasm_runner.zig"),
         .target = b.resolveTargetQuery(.{ .cpu_arch = .wasm32, .os_tag = .freestanding }),
         .optimize = std.builtin.OptimizeMode.ReleaseSmall,
+        .use_llvm = false
     });
 
     wasm.entry = .disabled;
@@ -20,9 +21,11 @@ pub fn build(b: *std.Build) void {
 
     const fs_tests = b.addRunArtifact(b.addTest(.{
         .root_source_file = b.path("fs.zig"),
+        .use_llvm = false
     }));
     const inode_tests = b.addRunArtifact(b.addTest(.{
         .root_source_file = b.path("INode.zig"),
+        .use_llvm = false
     }));
 
     test_step.dependOn(&inode_tests.step);
