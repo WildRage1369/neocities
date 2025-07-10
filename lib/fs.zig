@@ -1,7 +1,9 @@
 const std = @import("std");
 const builtin = @import("builtin");
+
 const INode = @import("INode.zig").INode;
 const Timestamp = @import("INode.zig").Timestamp;
+const FileType = @import("INode.zig").FileType;
 
 const FileOpenError = error{
     AccessDenied,
@@ -32,6 +34,7 @@ pub const FileSystemTree = struct {
                 this.allocator,
                 "/",
                 this.getSerialNum(),
+                FileType.directory,
                 0,
                 Timestamp.currentTime(),
                 0o755,
@@ -42,10 +45,10 @@ pub const FileSystemTree = struct {
         };
 
         // create base directories
-        try this.root.addChildINode(try INode.create(this.allocator, "tmp", this.getSerialNum(), 0, Timestamp.currentTime(), 0o755, null, null, this.root));
-        try this.root.addChildINode(try INode.create(this.allocator, "home", this.getSerialNum(), 0, Timestamp.currentTime(), 0o755, null, null, this.root));
-        try this.root.addChildINode(try INode.create(this.allocator, "bin", this.getSerialNum(), 0, Timestamp.currentTime(), 0o755, null, null, this.root));
-        try this.root.addChildINode(try INode.create(this.allocator, "dev", this.getSerialNum(), 0, Timestamp.currentTime(), 0o755, null, null, this.root));
+        try this.root.addChildINode(try INode.create(this.allocator, "tmp", this.getSerialNum(), FileType.directory, 0, Timestamp.currentTime(), 0o755, null, null, this.root));
+        try this.root.addChildINode(try INode.create(this.allocator, "home", this.getSerialNum(), FileType.directory, 0, Timestamp.currentTime(), 0o755, null, null, this.root));
+        try this.root.addChildINode(try INode.create(this.allocator, "bin", this.getSerialNum(), FileType.directory, 0, Timestamp.currentTime(), 0o755, null, null, this.root));
+        try this.root.addChildINode(try INode.create(this.allocator, "dev", this.getSerialNum(), FileType.directory, 0, Timestamp.currentTime(), 0o755, null, null, this.root));
         return this;
     }
 
@@ -58,6 +61,7 @@ pub const FileSystemTree = struct {
     /// @param file_path: string full path to file
     /// @param flags: int W_Flags
     /// @param data: string data to write
+    /// @param data_type: FileType
     /// @returns number of bytes written
     /// @returns -1 if file already exists and W_Flags.EXCL is set
     /// @returns -2 if file_path is not found
@@ -66,23 +70,25 @@ pub const FileSystemTree = struct {
         file_path: []const u8,
         flags: u32,
         data: []const u8,
+        data_type: FileType,
     ) !usize {
         //check if file exists
         var file = self.getINode(file_path) catch null;
 
         // if file already exists and W_Flags.EXCL, error out
-        if (flags & @intFromEnum(W_Flags.EXCL) != 0 and file != null) {
+        if (W_Flags.EXCL.check(flags) and file != null) {
             return FileOpenError.AccessDenied;
         }
 
         // create file if it doesn't exist and W_Flags.CREAT is set
-        if (flags & @intFromEnum(W_Flags.CREAT) != 0 and file == null) {
+        if (W_Flags.CREAT.check(flags) and file == null) {
             const dir = try self.getINode(file_path[0..std.mem.lastIndexOf(u8, file_path, "/").?]);
 
             file = try INode.create(
                 self.allocator,
                 file_path[std.mem.lastIndexOf(u8, file_path, "/").? + 1 ..],
                 self.getSerialNum(),
+                data_type,
                 data.len,
                 Timestamp.currentTime(),
                 0o755,
@@ -100,8 +106,9 @@ pub const FileSystemTree = struct {
 
         const found_file = file.?;
 
-        // write data to file
-        if (flags & @intFromEnum(W_Flags.APPEND) != 0) {
+        //  ----- write data to file -----
+
+        if (W_Flags.APPEND.check(flags)) {
             const old_data = self.file_data_map.get(found_file.serial_number);
             if (old_data) |old| {
                 var buf = self.allocator.alloc(u8, old.len + data.len + 1) catch unreachable;
@@ -113,7 +120,7 @@ pub const FileSystemTree = struct {
                 const buf = self.allocator.dupe(u8, data) catch unreachable;
                 try self.file_data_map.put(found_file.serial_number, buf);
             }
-        } else if (flags & @intFromEnum(W_Flags.TRUNC) != 0) {
+        } else if (W_Flags.TRUNC.check(flags)) {
             const buf = self.allocator.dupe(u8, data) catch unreachable;
             try self.file_data_map.put(found_file.serial_number, buf);
         }
@@ -166,6 +173,10 @@ const W_Flags = enum {
     CREAT,
     EXCL,
     TRUNC,
+
+    pub fn check(self: W_Flags, flags: u32) bool {
+        return (flags & @intFromEnum(self)) != 0;
+    }
 };
 
 test "init" {
@@ -179,7 +190,7 @@ test "write only" {
     var fs = try FileSystemTree.create(allocator);
     defer fs.destroy();
 
-    const bytes_written = try fs.write("/tmp/test.txt", @intFromEnum(W_Flags.CREAT), "Hello There");
+    const bytes_written = try fs.write("/tmp/test.txt", @intFromEnum(W_Flags.CREAT), "Hello There", .string);
     try std.testing.expect(bytes_written == 11);
 }
 
@@ -189,7 +200,7 @@ test "read and write" {
 
     defer fs.destroy();
 
-    const bytes_written = try fs.write("/tmp/test.txt", @intFromEnum(W_Flags.CREAT), "Hello There");
+    const bytes_written = try fs.write("/tmp/test.txt", @intFromEnum(W_Flags.CREAT), "Hello There", .string);
     const bytes_read = try fs.read("/tmp/test.txt");
 
     try std.testing.expect(bytes_written == 11);
@@ -204,7 +215,7 @@ test "fuzz read and write" {
             var fs = try FileSystemTree.create(allocator);
             defer fs.destroy();
 
-            _ = try fs.write("/tmp/test.txt", @intFromEnum(W_Flags.CREAT), input);
+            _ = try fs.write("/tmp/test.txt", @intFromEnum(W_Flags.CREAT), input, .string);
             const bytes_read = try fs.read("/tmp/test.txt");
             try std.testing.expect(std.mem.eql(u8, bytes_read, input));
         }

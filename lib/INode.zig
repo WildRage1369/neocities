@@ -14,7 +14,15 @@ pub const Timestamp = struct {
     }
 };
 
+pub const FileType = enum {
+    directory,
+    executable,
+    string,
+    binary,
+};
+
 pub const INode = struct {
+    file_type: FileType,
     serial_number: u64,
     name: []const u8,
     file_mode: u16, // file permissions
@@ -28,6 +36,7 @@ pub const INode = struct {
         allocator: std.mem.Allocator,
         name: []const u8,
         serial_number: u64,
+        file_type: FileType,
         owner: usize,
         timestamp: Timestamp,
         file_mode: u16,
@@ -40,6 +49,7 @@ pub const INode = struct {
 
         this.* = .{
             .name = name,
+            .file_type = file_type,
             .serial_number = serial_number,
             .file_mode = file_mode,
             .owner = owner,
@@ -58,7 +68,6 @@ pub const INode = struct {
         child.parent = self;
     }
 
-
     /// @brief Add a list of children INodes to this INode
     /// @param new_children: ArrayList of INodes to add to this INode's children
     pub fn addChildArrayList(self: *INode, new_children: *std.ArrayList(*INode)) !void {
@@ -76,11 +85,6 @@ pub const INode = struct {
         self.parent = parent;
     }
 
-    /// @brief Check if this INode is a directory
-    pub fn isDirectory(self: *INode) bool {
-        return self.children.length > 0;
-    }
-
     pub fn deallocate(self: *INode, alloc: std.mem.Allocator) void {
         for (self.children.items) |child| {
             child.deallocate(alloc); // recursively destroy children
@@ -92,18 +96,18 @@ pub const INode = struct {
 
 test INode {
     const allocator = std.testing.allocator;
-    const inode = try INode.create(allocator, "test", 1, 2, Timestamp.currentTime(), 0o755, null, null, null);
+    const inode = try INode.create(allocator, "test", 1, FileType.directory, 2, Timestamp.currentTime(), 0o755, null, null, null);
     defer inode.deallocate(allocator);
 }
 
 test "addChildINode" {
     const allocator = std.testing.allocator;
 
-    const inode = try INode.create(allocator, "test", 1, 2, Timestamp.currentTime(), 0o755, null, null, null);
+    const inode = try INode.create(allocator, "test", 1, FileType.directory, 2, Timestamp.currentTime(), 0o755, null, null, null);
     defer inode.deallocate(allocator);
 
     // do NOT defer as ownership is transferred to parent INode
-    const child = try INode.create(allocator, "child", 1, 2, Timestamp.currentTime(), 0o755, null, null, null);
+    const child = try INode.create(allocator, "child", 1, FileType.directory, 2, Timestamp.currentTime(), 0o755, null, null, null);
 
     try inode.addChildINode(child);
 }
@@ -112,9 +116,9 @@ test "changeParent" {
     const allocator = std.testing.allocator;
 
     // do NOT defer as ownership is transferred to parent INode
-    const inode = try INode.create(allocator, "test", 1, 2, Timestamp.currentTime(), 0o755, null, null, null);
+    const inode = try INode.create(allocator, "test", 1, FileType.directory, 2, Timestamp.currentTime(), 0o755, null, null, null);
 
-    const parent = try INode.create(allocator, "parent", 1, 2, Timestamp.currentTime(), 0o755, null, null, null);
+    const parent = try INode.create(allocator, "parent", 1, FileType.directory, 2, Timestamp.currentTime(), 0o755, null, null, null);
     defer parent.deallocate(allocator);
 
     try inode.changeParent(parent);
@@ -129,15 +133,6 @@ test "changeParent" {
 //     try inode.addChildArrayList(&std.ArrayList(*INode).init(allocator));
 // }
 //
-// test "empty addParentArrayList" {
-//     const allocator = std.testing.allocator;
-//
-//     const inode = try INode.create(allocator, "test", 1, 2, Timestamp.currentTime(), 0o755, null, null, null);
-//     defer inode.deallocate(allocator);
-//
-//     try inode.AddParentArrayList(&std.ArrayList(*INode).init(allocator));
-// }
-
 // test "addChildArrayList" {
 //     const allocator = std.testing.allocator;
 //
@@ -154,21 +149,3 @@ test "changeParent" {
 //
 //     try inode.addChildArrayList(&arr);
 // }
-//
-// test "addParentArrayList" {
-//     const allocator = std.testing.allocator;
-//
-//     const inode = try INode.create(allocator, "test", 1, 2, Timestamp.currentTime(), 0o755, null, null, null);
-//     defer inode.deallocate(allocator);
-//
-//     const parent = try INode.create(allocator, "parent", 1, 2, Timestamp.currentTime(), 0o755, null, null, null);
-//     defer parent.deallocate(allocator);
-//
-//     var arr = std.ArrayList(*INode).init(allocator);
-//     defer arr.deinit();
-//
-//     try arr.append(parent);
-//
-//     try inode.AddParentArrayList(&arr);
-// }
-//
