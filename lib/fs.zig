@@ -30,25 +30,35 @@ pub const FileSystemTree = struct {
             .allocator = allocator,
             .file_data_map = std.AutoHashMap(usize, []const u8).init(allocator),
             .serial_number_counter = 1,
-            .root = try INode.create(
-                this.allocator,
-                "/",
-                this.getSerialNum(),
-                FileType.directory,
-                0,
-                Timestamp.currentTime(),
-                0o755,
-                null,
-                null,
-                null,
-            ),
+            .root = try INode.create(.{
+                .allocator = this.allocator,
+                .name = "/",
+                .serial_number = this.getSerialNum(),
+                .file_type = FileType.directory,
+                .timestamp = Timestamp.currentTime(),
+            }),
         };
 
         // create base directories
-        try this.root.addChildINode(try INode.create(this.allocator, "tmp", this.getSerialNum(), FileType.directory, 0, Timestamp.currentTime(), 0o755, null, null, this.root));
-        try this.root.addChildINode(try INode.create(this.allocator, "home", this.getSerialNum(), FileType.directory, 0, Timestamp.currentTime(), 0o755, null, null, this.root));
-        try this.root.addChildINode(try INode.create(this.allocator, "bin", this.getSerialNum(), FileType.directory, 0, Timestamp.currentTime(), 0o755, null, null, this.root));
-        try this.root.addChildINode(try INode.create(this.allocator, "dev", this.getSerialNum(), FileType.directory, 0, Timestamp.currentTime(), 0o755, null, null, this.root));
+        var opts = .{
+            .name = "tmp",
+            .serial_number = this.getSerialNum(),
+            .file_type = FileType.directory,
+            .timestamp = Timestamp.currentTime(),
+            .parent = this.root,
+            .allocator = this.allocator,
+        };
+        try this.root.addChildINode(try INode.create(opts));
+        opts.name = "home";
+        opts.serial_number = this.getSerialNum();
+        try this.root.addChildINode(try INode.create(opts));
+        opts.name = "bin";
+        opts.serial_number = this.getSerialNum();
+        try this.root.addChildINode(try INode.create(opts));
+        opts.name = "dev";
+        opts.serial_number = this.getSerialNum();
+        try this.root.addChildINode(try INode.create(opts));
+
         return this;
     }
 
@@ -58,6 +68,24 @@ pub const FileSystemTree = struct {
         return self.serial_number_counter;
     }
 
+    pub fn touch(
+        self: *FileSystemTree,
+        file_path: []const u8,
+        data_type: FileType,
+    ) !void {
+        const parent_directory = try self.getINode(file_path[0..std.mem.lastIndexOf(u8, file_path, "/").?]);
+
+        const file = try INode.create(.{
+            .allocator = self.allocator,
+            .name = file_path[std.mem.lastIndexOf(u8, file_path, "/").? + 1 ..],
+            .serial_number = self.getSerialNum(),
+            .data_type = data_type,
+            .timestamp = Timestamp.currentTime(),
+            .parent = parent_directory,
+        });
+        try parent_directory.addChildINode(file.?);
+    }
+
     /// @param file_path: string full path to file
     /// @param flags: W_Flags struct with write flags
     /// @param data: string data to write
@@ -65,7 +93,7 @@ pub const FileSystemTree = struct {
     /// @returns number of bytes written
     /// @returns -1 if file already exists and W_Flags.EXCL is set
     /// @returns -2 if file_path is not found
-    pub fn write(
+    pub fn writeByPath(
         self: *FileSystemTree,
         file_path: []const u8,
         flags: W_Flags,
@@ -84,17 +112,15 @@ pub const FileSystemTree = struct {
         if (flags.CREAT == true and file == null) {
             const dir = try self.getINode(file_path[0..std.mem.lastIndexOf(u8, file_path, "/").?]);
 
-            file = try INode.create(
-                self.allocator,
-                file_path[std.mem.lastIndexOf(u8, file_path, "/").? + 1 ..],
-                self.getSerialNum(),
-                data_type,
-                data.len,
-                Timestamp.currentTime(),
-                0o755,
-                null,
-                null,
-                dir,
+            file = try INode.create(.{
+                .allocator = self.allocator,
+                .name = file_path[std.mem.lastIndexOf(u8, file_path, "/").? + 1 ..],
+                .serial_number = self.getSerialNum(),
+                .data_type = data_type,
+                .size = data.len,
+                .timestamp = Timestamp.currentTime(),
+                .parent = dir,
+            }
             );
             // create file
             try dir.addChildINode(file.?);
@@ -187,7 +213,7 @@ test "write only" {
     var fs = try FileSystemTree.create(allocator);
     defer fs.destroy();
 
-    const bytes_written = try fs.write("/tmp/test.txt", .{ .CREAT = true }, "Hello There", .string);
+    const bytes_written = try fs.writeByPath("/tmp/test.txt", .{ .CREAT = true }, "Hello There", .string);
     try std.testing.expect(bytes_written == 11);
 }
 
@@ -197,7 +223,7 @@ test "read and write only" {
 
     defer fs.destroy();
 
-    const bytes_written = try fs.write("/tmp/test.txt", .{ .CREAT = true }, "Hello There", .string);
+    const bytes_written = try fs.writeByPath("/tmp/test.txt", .{ .CREAT = true }, "Hello There", .string);
     const bytes_read = try fs.read("/tmp/test.txt");
 
     try std.testing.expect(bytes_written == 11);
@@ -212,7 +238,7 @@ test "fuzz read and write" {
             var fs = try FileSystemTree.create(allocator);
             defer fs.destroy();
 
-            _ = try fs.write("/tmp/test.txt", .{ .CREAT = true }, input, .string);
+            _ = try fs.writeByPath("/tmp/test.txt", .{ .CREAT = true }, input, .string);
             const bytes_read = try fs.read("/tmp/test.txt");
             try std.testing.expect(std.mem.eql(u8, bytes_read, input));
         }
@@ -232,6 +258,6 @@ test "write to already existing file with EXCL flag" {
     const allocator = std.testing.allocator;
     var fs = try FileSystemTree.create(allocator);
     defer fs.destroy();
-    _ = try fs.write("/tmp/test.txt", .{ .CREAT = true }, "Hello There", .string);
-    try std.testing.expectError(FileOpenError.AccessDenied, fs.write("/tmp/test.txt", .{ .EXCL = true }, "Hello There", .string));
+    _ = try fs.writeByPath("/tmp/test.txt", .{ .CREAT = true }, "Hello There", .string);
+    try std.testing.expectError(FileOpenError.AccessDenied, fs.writeByPath("/tmp/test.txt", .{ .EXCL = true }, "Hello There", .string));
 }

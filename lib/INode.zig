@@ -21,6 +21,19 @@ pub const FileType = enum {
     binary,
 };
 
+pub const INodeCreateOptions = struct {
+    allocator: std.mem.Allocator,
+    name: []const u8,
+    serial_number: u64,
+    file_type: FileType,
+    timestamp: Timestamp,
+    owner: usize = 1,
+    file_mode: u16 = 0o755,
+    size: ?u64 = null,
+    children: ?std.ArrayList(*INode) = null,
+    parent: ?*INode = null,
+};
+
 pub const INode = struct {
     file_type: FileType,
     serial_number: u64,
@@ -32,31 +45,20 @@ pub const INode = struct {
     children: std.ArrayList(*INode),
     parent: *INode,
 
-    pub fn create(
-        allocator: std.mem.Allocator,
-        name: []const u8,
-        serial_number: u64,
-        file_type: FileType,
-        owner: usize,
-        timestamp: Timestamp,
-        file_mode: u16,
-        size: ?u64,
-        children: ?std.ArrayList(*INode),
-        parent: ?*INode,
-    ) !*INode {
-        const this = try allocator.create(INode);
-        errdefer allocator.destroy(this);
+    pub fn create(options: INodeCreateOptions) !*INode {
+        const this = try options.allocator.create(INode);
+        errdefer options.allocator.destroy(this);
 
         this.* = .{
-            .name = name,
-            .file_type = file_type,
-            .serial_number = serial_number,
-            .file_mode = file_mode,
-            .owner = owner,
-            .timestamp = timestamp,
-            .size = size orelse 0,
-            .children = children orelse std.ArrayList(*INode).init(allocator),
-            .parent = parent orelse this,
+            .name = options.name,
+            .file_type = options.file_type,
+            .serial_number = options.serial_number,
+            .file_mode = options.file_mode,
+            .owner = options.owner,
+            .timestamp = options.timestamp,
+            .size = options.size orelse 0,
+            .children = options.children orelse std.ArrayList(*INode).init(options.allocator),
+            .parent = options.parent orelse this,
         };
         return this;
     }
@@ -96,18 +98,36 @@ pub const INode = struct {
 
 test INode {
     const allocator = std.testing.allocator;
-    const inode = try INode.create(allocator, "test", 1, FileType.directory, 2, Timestamp.currentTime(), 0o755, null, null, null);
+    const inode = try INode.create(.{
+        .allocator = allocator,
+        .name = "test",
+        .serial_number = 1,
+        .file_type = FileType.directory,
+        .timestamp = Timestamp.currentTime(),
+    });
     defer inode.deallocate(allocator);
 }
 
 test "addChildINode" {
     const allocator = std.testing.allocator;
 
-    const inode = try INode.create(allocator, "test", 1, FileType.directory, 2, Timestamp.currentTime(), 0o755, null, null, null);
+    const inode = try INode.create(.{
+        .allocator = allocator,
+        .name = "test",
+        .serial_number = 1,
+        .file_type = FileType.directory,
+        .timestamp = Timestamp.currentTime(),
+    });
     defer inode.deallocate(allocator);
 
     // do NOT defer as ownership is transferred to parent INode
-    const child = try INode.create(allocator, "child", 1, FileType.directory, 2, Timestamp.currentTime(), 0o755, null, null, null);
+    const child = try INode.create(.{
+        .allocator = allocator,
+        .name = "child",
+        .serial_number = 2,
+        .file_type = FileType.directory,
+        .timestamp = Timestamp.currentTime(),
+    });
 
     try inode.addChildINode(child);
 }
@@ -116,9 +136,21 @@ test "changeParent" {
     const allocator = std.testing.allocator;
 
     // do NOT defer as ownership is transferred to parent INode
-    const inode = try INode.create(allocator, "test", 1, FileType.directory, 2, Timestamp.currentTime(), 0o755, null, null, null);
+    const inode = try INode.create(.{
+        .allocator = allocator,
+        .name = "test",
+        .serial_number = 1,
+        .file_type = FileType.directory,
+        .timestamp = Timestamp.currentTime(),
+    });
 
-    const parent = try INode.create(allocator, "parent", 1, FileType.directory, 2, Timestamp.currentTime(), 0o755, null, null, null);
+    const parent = try INode.create(.{
+        .allocator = allocator,
+        .name = "parent",
+        .serial_number = 1,
+        .file_type = FileType.directory,
+        .timestamp = Timestamp.currentTime(),
+    });
     defer parent.deallocate(allocator);
 
     try inode.changeParent(parent);
