@@ -68,6 +68,10 @@ pub const FileSystemTree = struct {
         return self.serial_number_counter;
     }
 
+    /// @brief Creates a file with the given path and data type
+    /// @param file_path: string full path to file
+    /// @param data_type: FileType
+    /// @returns void
     pub fn touch(
         self: *FileSystemTree,
         file_path: []const u8,
@@ -91,8 +95,6 @@ pub const FileSystemTree = struct {
     /// @param data: string data to write
     /// @param data_type: FileType
     /// @returns number of bytes written
-    /// @returns -1 if file already exists and W_Flags.EXCL is set
-    /// @returns -2 if file_path is not found
     pub fn writeByPath(
         self: *FileSystemTree,
         file_path: []const u8,
