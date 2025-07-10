@@ -59,7 +59,7 @@ pub const FileSystemTree = struct {
     }
 
     /// @param file_path: string full path to file
-    /// @param flags: int W_Flags
+    /// @param flags: W_Flags struct with write flags
     /// @param data: string data to write
     /// @param data_type: FileType
     /// @returns number of bytes written
@@ -68,7 +68,7 @@ pub const FileSystemTree = struct {
     pub fn write(
         self: *FileSystemTree,
         file_path: []const u8,
-        flags: u32,
+        flags: W_Flags,
         data: []const u8,
         data_type: FileType,
     ) !usize {
@@ -76,12 +76,12 @@ pub const FileSystemTree = struct {
         var file = self.getINode(file_path) catch null;
 
         // if file already exists and W_Flags.EXCL, error out
-        if (W_Flags.EXCL.check(flags) and file != null) {
+        if (flags.EXCL == true and file != null) {
             return FileOpenError.AccessDenied;
         }
 
         // create file if it doesn't exist and W_Flags.CREAT is set
-        if (W_Flags.CREAT.check(flags) and file == null) {
+        if (flags.CREAT == true and file == null) {
             const dir = try self.getINode(file_path[0..std.mem.lastIndexOf(u8, file_path, "/").?]);
 
             file = try INode.create(
@@ -108,7 +108,10 @@ pub const FileSystemTree = struct {
 
         //  ----- write data to file -----
 
-        if (W_Flags.APPEND.check(flags)) {
+        if (flags.TRUNC == true or flags.APPEND == false) {
+            const buf = self.allocator.dupe(u8, data) catch unreachable;
+            try self.file_data_map.put(found_file.serial_number, buf);
+        } else if (flags.APPEND == true) {
             const old_data = self.file_data_map.get(found_file.serial_number);
             if (old_data) |old| {
                 var buf = self.allocator.alloc(u8, old.len + data.len + 1) catch unreachable;
@@ -120,11 +123,7 @@ pub const FileSystemTree = struct {
                 const buf = self.allocator.dupe(u8, data) catch unreachable;
                 try self.file_data_map.put(found_file.serial_number, buf);
             }
-        } else if (W_Flags.TRUNC.check(flags)) {
-            const buf = self.allocator.dupe(u8, data) catch unreachable;
-            try self.file_data_map.put(found_file.serial_number, buf);
         }
-
         return data.len;
     }
 
@@ -132,6 +131,7 @@ pub const FileSystemTree = struct {
     /// @returns string data read from file
     pub fn read(self: *FileSystemTree, file_path: []const u8) FileOpenError![]const u8 {
         const file = try self.getINode(file_path);
+        // return self.file_data_map.get(file.serial_number) orelse std.debug.panic("INode.serial_number not found in file_data_map\n", .{});
         return self.file_data_map.get(file.serial_number) orelse "FAIL";
     }
 
@@ -168,15 +168,12 @@ pub const FileSystemTree = struct {
         self.allocator.destroy(self);
     }
 };
-const W_Flags = enum {
-    APPEND,
-    CREAT,
-    EXCL,
-    TRUNC,
 
-    pub fn check(self: W_Flags, flags: u32) bool {
-        return (flags & @intFromEnum(self)) != 0;
-    }
+const W_Flags = packed struct {
+    APPEND: bool = false,
+    CREAT: bool = false,
+    EXCL: bool = false,
+    TRUNC: bool = false,
 };
 
 test "init" {
@@ -190,17 +187,17 @@ test "write only" {
     var fs = try FileSystemTree.create(allocator);
     defer fs.destroy();
 
-    const bytes_written = try fs.write("/tmp/test.txt", @intFromEnum(W_Flags.CREAT), "Hello There", .string);
+    const bytes_written = try fs.write("/tmp/test.txt", .{ .CREAT = true }, "Hello There", .string);
     try std.testing.expect(bytes_written == 11);
 }
 
-test "read and write" {
+test "read and write only" {
     const allocator = std.testing.allocator;
     var fs = try FileSystemTree.create(allocator);
 
     defer fs.destroy();
 
-    const bytes_written = try fs.write("/tmp/test.txt", @intFromEnum(W_Flags.CREAT), "Hello There", .string);
+    const bytes_written = try fs.write("/tmp/test.txt", .{ .CREAT = true }, "Hello There", .string);
     const bytes_read = try fs.read("/tmp/test.txt");
 
     try std.testing.expect(bytes_written == 11);
@@ -215,7 +212,7 @@ test "fuzz read and write" {
             var fs = try FileSystemTree.create(allocator);
             defer fs.destroy();
 
-            _ = try fs.write("/tmp/test.txt", @intFromEnum(W_Flags.CREAT), input, .string);
+            _ = try fs.write("/tmp/test.txt", .{ .CREAT = true }, input, .string);
             const bytes_read = try fs.read("/tmp/test.txt");
             try std.testing.expect(std.mem.eql(u8, bytes_read, input));
         }
@@ -229,4 +226,12 @@ test "read non-existent file" {
     defer fs.destroy();
 
     try std.testing.expectError(FileOpenError.FileNotFound, fs.read("/tmp/test.txt"));
+}
+
+test "write to already existing file with EXCL flag" {
+    const allocator = std.testing.allocator;
+    var fs = try FileSystemTree.create(allocator);
+    defer fs.destroy();
+    _ = try fs.write("/tmp/test.txt", .{ .CREAT = true }, "Hello There", .string);
+    try std.testing.expectError(FileOpenError.AccessDenied, fs.write("/tmp/test.txt", .{ .EXCL = true }, "Hello There", .string));
 }
