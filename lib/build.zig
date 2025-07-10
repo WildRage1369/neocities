@@ -5,11 +5,10 @@ pub fn build(b: *std.Build) void {
 
     // build wasm file with `zig build`
     const wasm = b.addExecutable(.{
-        .name = "fs",
+        .name = "wasm_runner",
         .root_source_file = b.path("wasm_runner.zig"),
         .target = b.resolveTargetQuery(.{ .cpu_arch = .wasm32, .os_tag = .freestanding }),
         .optimize = std.builtin.OptimizeMode.ReleaseSmall,
-        .use_llvm = false
     });
 
     wasm.entry = .disabled;
