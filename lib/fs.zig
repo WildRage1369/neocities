@@ -40,7 +40,7 @@ pub const FileSystemTree = struct {
         };
 
         // create base directories
-        var opts = .{
+        var opts: INode.CreateArgs = .{
             .name = "tmp",
             .serial_number = this.getSerialNum(),
             .file_type = FileType.directory,

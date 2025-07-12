@@ -21,18 +21,6 @@ pub const FileType = enum {
     binary,
 };
 
-pub const INodeCreateOptions = struct {
-    allocator: std.mem.Allocator,
-    name: []const u8,
-    serial_number: u64,
-    file_type: FileType,
-    timestamp: Timestamp,
-    owner: usize = 1,
-    file_mode: u16 = 0o755,
-    size: ?u64 = null,
-    children: ?std.ArrayList(*INode) = null,
-    parent: ?*INode = null,
-};
 
 pub const INode = struct {
     file_type: FileType,
@@ -45,7 +33,7 @@ pub const INode = struct {
     children: std.ArrayList(*INode),
     parent: *INode,
 
-    pub fn create(options: INodeCreateOptions) !*INode {
+    pub fn create(options: INode.CreateArgs) !*INode {
         const this = try options.allocator.create(INode);
         errdefer options.allocator.destroy(this);
 
@@ -94,6 +82,19 @@ pub const INode = struct {
         self.children.deinit();
         alloc.destroy(self);
     }
+
+pub const CreateArgs = struct {
+    allocator: std.mem.Allocator,
+    name: []const u8,
+    serial_number: u64,
+    file_type: FileType,
+    timestamp: Timestamp,
+    owner: usize = 1,
+    file_mode: u16 = 0o755,
+    size: ?u64 = null,
+    children: ?std.ArrayList(*INode) = null,
+    parent: ?*INode = null,
+};
 };
 
 test INode {
