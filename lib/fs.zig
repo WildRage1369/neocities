@@ -6,6 +6,7 @@ const Timestamp = @import("INode.zig").Timestamp;
 const FileType = @import("INode.zig").FileType;
 
 const FileOpenError = error{
+Exist,
     AccessDenied,
     FileNotFound,
 };
@@ -16,6 +17,7 @@ const FileOpenError = error{
 pub const FileSystemTree = struct {
     root: *INode,
     file_data_map: std.AutoHashMap(usize, []const u8),
+    fd_table: std.AutoHashMap(usize, u64), // file descriptor -> serial number
     serial_number_counter: u16,
     allocator: std.mem.Allocator,
 
@@ -29,6 +31,7 @@ pub const FileSystemTree = struct {
         this.* = .{
             .allocator = allocator,
             .file_data_map = std.AutoHashMap(usize, []const u8).init(allocator),
+            .fd_table = std.AutoHashMap(usize, u64).init(allocator),
             .serial_number_counter = 1,
             .root = try INode.create(.{
                 .allocator = this.allocator,
@@ -68,6 +71,36 @@ pub const FileSystemTree = struct {
         return self.serial_number_counter;
     }
 
+    pub const O_Flags = struct {
+        CREAT: bool = false,
+        EXCL: bool = false,
+    };
+
+    /// @param file_path: string full path to file
+    /// @param flags: O_Flags
+    /// @returns file descriptor
+    pub fn open(self: *FileSystemTree, file_path: []const u8, flags: O_Flags) !isize {
+        // find next open FD
+        const next_fd = for (0..std.math.maxInt(isize)) |idx| {
+            if (!self.fd_table.contains(idx)) { break idx; }
+        };
+
+        // if file already exists, modify fd_table and return fd
+        const node = self.getINode(file_path) catch null;
+        if (node) |n| {
+            if (flags.EXCL == true) { return FileOpenError.Exist; }
+            try self.fd_table.put(next_fd, n.serial_number);
+            return next_fd;
+        }
+
+        if (flags.CREAT == false) { return FileOpenError; }
+
+        self.touch(file_path);
+
+
+        return next_fd;
+    }
+
     /// @brief Creates a file with the given path and data type
     /// @param file_path: string full path to file
     /// @param data_type: FileType
@@ -75,7 +108,7 @@ pub const FileSystemTree = struct {
     pub fn touch(
         self: *FileSystemTree,
         file_path: []const u8,
-        data_type: FileType,
+        data_type: ?FileType,
     ) !void {
         const parent_directory = try self.getINode(file_path[0..std.mem.lastIndexOf(u8, file_path, "/").?]);
 
@@ -83,7 +116,7 @@ pub const FileSystemTree = struct {
             .allocator = self.allocator,
             .name = file_path[std.mem.lastIndexOf(u8, file_path, "/").? + 1 ..],
             .serial_number = self.getSerialNum(),
-            .data_type = data_type,
+            .data_type = data_type orelse FileType.binary,
             .timestamp = Timestamp.currentTime(),
             .parent = parent_directory,
         });
