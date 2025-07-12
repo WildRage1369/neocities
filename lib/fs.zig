@@ -123,7 +123,25 @@ pub const FileSystemTree = struct {
 
         return next_fd;
     }
+    
+    /// @param fd: file descriptor to close
+    /// @throws FileDescriptorError.BADFD if fd is not found in fd_table
+    pub fn close(self: *FileSystemTree, fd: usize) !void {
+        if (self.fd_table.remove(fd)) {
+            return;
+        } else {
+            return error.FileDescriptorError.BADFD;
+        }
+    }
 
+
+    /// @param fd: file descriptor to read from
+    /// @returns string data read from file
+    /// @throws FileDescriptorError.BADFD if fd is not found in fd_table
+    pub fn read(self: *FileSystemTree, fd: usize) FileOpenError![]const u8 {
+        const serial = self.fd_table.get(fd) orelse return error.FileDescriptorError.BADFD;
+        return self.file_data_map.get(serial) orelse unreachable;
+    }
     /// @brief Creates a file with the given path and data type
     /// @param file_path: string full path to file
     /// @param data_type: null or FileType
@@ -199,13 +217,6 @@ pub const FileSystemTree = struct {
         return data.len;
     }
 
-    /// @param file_path: string full path to file
-    /// @returns string data read from file
-    pub fn read(self: *FileSystemTree, file_path: []const u8) FileOpenError![]const u8 {
-        const file = try self.getINode(file_path);
-        // return self.file_data_map.get(file.serial_number) orelse std.debug.panic("INode.serial_number not found in file_data_map\n", .{});
-        return self.file_data_map.get(file.serial_number) orelse "FAIL";
-    }
 
     /// @return returns the INode of the file located at file_path
     /// @param file_path: string
