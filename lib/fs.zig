@@ -11,6 +11,7 @@ Exist,
     FileNotFound,
 };
 
+
 /// FileSystemTree is a file system implementation that uses a hash table to store
 /// file data. It is designed to be used in a WebAssembly environment.
 /// It is required to call .destroy() on it to free the memory
@@ -89,12 +90,6 @@ pub const FileSystemTree = struct {
         return this;
     }
 
-    /// @returns serial number pre-incremented
-    fn getSerialNum(self: *FileSystemTree) u64 {
-        defer self.serial_number_counter += 1;
-        return self.serial_number_counter;
-    }
-
     pub const O_Flags = struct {
         CREAT: bool = false,
         EXCL: bool = false,
@@ -141,27 +136,6 @@ pub const FileSystemTree = struct {
     pub fn read(self: *FileSystemTree, fd: usize) FileOpenError![]const u8 {
         const serial = self.fd_table.get(fd) orelse return error.FileDescriptorError.BADFD;
         return self.file_data_map.get(serial) orelse unreachable;
-    }
-    /// @brief Creates a file with the given path and data type
-    /// @param file_path: string full path to file
-    /// @param data_type: null or FileType
-    /// @returns void
-    pub fn touch(
-        self: *FileSystemTree,
-        file_path: []const u8,
-        data_type: ?FileType,
-    ) !void {
-        const parent_directory = try self.getINode(file_path[0..std.mem.lastIndexOf(u8, file_path, "/").?]);
-
-        const file = try INode.create(.{
-            .allocator = self.allocator,
-            .name = file_path[std.mem.lastIndexOf(u8, file_path, "/").? + 1 ..],
-            .serial_number = self.getSerialNum(),
-            .data_type = data_type orelse FileType.binary,
-            .timestamp = Timestamp.currentTime(),
-            .parent = parent_directory,
-        });
-        try parent_directory.addChildINode(file.?);
     }
 
     /// @param file_path: string full path to file
@@ -250,6 +224,37 @@ pub const FileSystemTree = struct {
         self.root.deallocate(self.allocator);
         self.allocator.destroy(self);
     }
+
+    // ---------- Private Functions ----------
+
+    /// @brief Creates a file with the given path and data type
+    /// @param file_path: string full path to file
+    /// @param data_type: null or FileType
+    /// @returns void
+    fn touch(
+        self: *FileSystemTree,
+        file_path: []const u8,
+        data_type: ?FileType,
+    ) !void {
+        const parent_directory = try self.getINode(file_path[0..std.mem.lastIndexOf(u8, file_path, "/").?]);
+
+        const file = try INode.create(.{
+            .allocator = self.allocator,
+            .name = file_path[std.mem.lastIndexOf(u8, file_path, "/").? + 1 ..],
+            .serial_number = self.getSerialNum(),
+            .data_type = data_type orelse FileType.binary,
+            .timestamp = Timestamp.currentTime(),
+            .parent = parent_directory,
+        });
+        try parent_directory.addChildINode(file.?);
+    }
+
+    /// @returns serial number pre-incremented
+    fn getSerialNum(self: *FileSystemTree) u64 {
+        defer self.serial_number_counter += 1;
+        return self.serial_number_counter;
+    }
+
 };
 
 const W_Flags = packed struct {
