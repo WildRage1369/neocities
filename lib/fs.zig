@@ -6,11 +6,10 @@ const Timestamp = @import("INode.zig").Timestamp;
 const FileType = @import("INode.zig").FileType;
 
 const FileOpenError = error{
-Exist,
+    Exist,
     AccessDenied,
     FileNotFound,
 };
-
 
 /// FileSystemTree is a file system implementation that uses a hash table to store
 /// file data. It is designed to be used in a WebAssembly environment.
@@ -101,24 +100,30 @@ pub const FileSystemTree = struct {
     pub fn open(self: *FileSystemTree, file_path: []const u8, flags: O_Flags) !isize {
         // find next open FD
         const next_fd = for (0..std.math.maxInt(isize)) |idx| {
-            if (!self.fd_table.contains(idx)) { break idx; }
+            if (!self.fd_table.contains(idx)) {
+                break idx;
+            }
         };
 
         // if file already exists, modify fd_table and return fd
         const node = self.getINode(file_path) catch null;
         if (node) |n| {
-            if (flags.EXCL == true) { return FileOpenError.Exist; }
+            if (flags.EXCL == true) {
+                return FileOpenError.Exist;
+            }
             try self.fd_table.put(next_fd, n.serial_number);
             return next_fd;
         }
 
-        if (flags.CREAT == false) { return FileOpenError; }
+        if (flags.CREAT == false) {
+            return FileOpenError;
+        }
 
         self.touch(file_path);
 
         return next_fd;
     }
-    
+
     /// @param fd: file descriptor to close
     /// @throws FileDescriptorError.BADFD if fd is not found in fd_table
     pub fn close(self: *FileSystemTree, fd: usize) !void {
@@ -129,7 +134,6 @@ pub const FileSystemTree = struct {
         }
     }
 
-
     /// @param fd: file descriptor to read from
     /// @returns string data read from file
     /// @throws FileDescriptorError.BADFD if fd is not found in fd_table
@@ -138,55 +142,36 @@ pub const FileSystemTree = struct {
         return self.file_data_map.get(serial) orelse unreachable;
     }
 
-    /// @param file_path: string full path to file
-    /// @param flags: W_Flags struct with write flags
+    pub const W_Flags = packed struct {
+        APPEND: bool = false,
+        TRUNC: bool = false,
+    };
+
+    /// @param fd: file descriptor to write to
+    /// @param flags: W_Flags
     /// @param data: string data to write
-    /// @param data_type: FileType
     /// @returns number of bytes written
-    pub fn writeByPath(
-        self: *FileSystemTree,
-        file_path: []const u8,
-        flags: W_Flags,
-        data: []const u8,
-        data_type: FileType,
-    ) !usize {
-        //check if file exists
-        var file = self.getINode(file_path) catch null;
-
-        // if file already exists and W_Flags.EXCL, error out
-        if (flags.EXCL == true and file != null) {
-            return FileOpenError.AccessDenied;
-        }
-
-        // create file if it doesn't exist and W_Flags.CREAT is set
-        if (flags.CREAT == true and file == null) {
-            self.touch(file_path, data_type);
-            file = self.getINode(file_path) catch unreachable;
-        }
-
-        if (file == null) {
-            return FileOpenError.FileNotFound;
-        }
-
-        const found_file = file.?;
-
-        //  ----- write data to file -----
+    /// @throws FileDescriptorError.BADFD if fd is not found in fd_table
+    pub fn write(self: *FileSystemTree, fd: usize, flags: W_Flags, data: []const u8) !usize {
+        const serial = self.fd_table.get(fd) orelse return error.FileDescriptorError.BADFD;
 
         if (flags.TRUNC == true or flags.APPEND == false) {
             const buf = self.allocator.dupe(u8, data) catch unreachable;
-            try self.file_data_map.put(found_file.serial_number, buf);
+            try self.file_data_map.put(serial, buf);
         } else if (flags.APPEND == true) {
-            const old_data = self.file_data_map.get(found_file.serial_number);
+            const old_data = self.file_data_map.get(serial);
             if (old_data) |old| {
                 var buf = self.allocator.alloc(u8, old.len + data.len + 1) catch unreachable;
                 std.mem.copyForwards(u8, buf, old);
                 std.mem.copyForwards(u8, buf[old.len..], data);
                 buf[data.len + old.len] = 0;
-                try self.file_data_map.put(found_file.serial_number, buf);
+                try self.file_data_map.put(serial, buf);
             } else {
                 const buf = self.allocator.dupe(u8, data) catch unreachable;
-                try self.file_data_map.put(found_file.serial_number, buf);
+                try self.file_data_map.put(serial, buf);
             }
+        } else {
+            return 0;
         }
         return data.len;
     }
@@ -254,14 +239,6 @@ pub const FileSystemTree = struct {
         defer self.serial_number_counter += 1;
         return self.serial_number_counter;
     }
-
-};
-
-const W_Flags = packed struct {
-    APPEND: bool = false,
-    CREAT: bool = false,
-    EXCL: bool = false,
-    TRUNC: bool = false,
 };
 
 test "init" {
