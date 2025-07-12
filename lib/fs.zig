@@ -32,22 +32,46 @@ pub const FileSystemTree = struct {
             .allocator = allocator,
             .file_data_map = std.AutoHashMap(usize, []const u8).init(allocator),
             .fd_table = std.AutoHashMap(usize, u64).init(allocator),
-            .serial_number_counter = 1,
+            .serial_number_counter = 0,
             .root = try INode.create(.{
                 .allocator = this.allocator,
                 .name = "/",
                 .serial_number = this.getSerialNum(),
                 .file_type = FileType.directory,
-                .timestamp = Timestamp.currentTime(),
             }),
         };
+
+        // fill fd_table with stdin, stdout, stderr
+        // stdin, stdout, and stderr are floating INodes, only accessable by FD
+        const stdin = try INode.create(.{
+            .allocator = this.allocator,
+            .name = "stdin",
+            .serial_number = this.getSerialNum(),
+            .file_type = FileType.character_device,
+        });
+        try this.fd_table.put(0, stdin.serial_number);
+
+        const stdout = try INode.create(.{
+            .allocator = this.allocator,
+            .name = "stdin",
+            .serial_number = this.getSerialNum(),
+            .file_type = FileType.character_device,
+        });
+        try this.fd_table.put(1, stdout.serial_number);
+
+        const stderr = try INode.create(.{
+            .allocator = this.allocator,
+            .name = "stdin",
+            .serial_number = this.getSerialNum(),
+            .file_type = FileType.character_device,
+        });
+        try this.fd_table.put(2, stderr.serial_number);
 
         // create base directories
         var opts: INode.CreateArgs = .{
             .name = "tmp",
             .serial_number = this.getSerialNum(),
             .file_type = FileType.directory,
-            .timestamp = Timestamp.currentTime(),
             .parent = this.root,
             .allocator = this.allocator,
         };
@@ -97,13 +121,12 @@ pub const FileSystemTree = struct {
 
         self.touch(file_path);
 
-
         return next_fd;
     }
 
     /// @brief Creates a file with the given path and data type
     /// @param file_path: string full path to file
-    /// @param data_type: FileType
+    /// @param data_type: null or FileType
     /// @returns void
     pub fn touch(
         self: *FileSystemTree,

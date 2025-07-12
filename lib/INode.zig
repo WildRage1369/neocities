@@ -19,6 +19,7 @@ pub const FileType = enum {
     executable,
     string,
     binary,
+    character_device
 };
 
 
@@ -43,7 +44,7 @@ pub const INode = struct {
             .serial_number = options.serial_number,
             .file_mode = options.file_mode,
             .owner = options.owner,
-            .timestamp = options.timestamp,
+            .timestamp = options.timestamp orelse Timestamp.currentTime(),
             .size = options.size orelse 0,
             .children = options.children orelse std.ArrayList(*INode).init(options.allocator),
             .parent = options.parent orelse this,
@@ -88,7 +89,7 @@ pub const CreateArgs = struct {
     name: []const u8,
     serial_number: u64,
     file_type: FileType,
-    timestamp: Timestamp,
+    timestamp: ?Timestamp = null,
     owner: usize = 1,
     file_mode: u16 = 0o755,
     size: ?u64 = null,
