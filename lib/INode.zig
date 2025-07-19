@@ -47,8 +47,11 @@ pub const INode = struct {
             .timestamp = options.timestamp orelse Timestamp.currentTime(),
             .size = options.size orelse 0,
             .children = options.children orelse std.ArrayList(*INode).init(options.allocator),
-            .parent = options.parent orelse this,
+            .parent = this,
         };
+        if (options.parent) |parent| {
+            try this.changeParent(parent);
+        }
         return this;
     }
 
@@ -156,6 +159,9 @@ test "changeParent" {
     defer parent.deallocate(allocator);
 
     try inode.changeParent(parent);
+
+    try std.testing.expect(inode.parent == parent);
+    try std.testing.expect(parent.children.getLast() == inode);
 }
 
 // test "empty addChildArrayList" {

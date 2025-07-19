@@ -41,32 +41,6 @@ pub const FileSystemTree = struct {
             }),
         };
 
-        // fill fd_table with stdin, stdout, stderr
-        // stdin, stdout, and stderr are floating INodes, only accessable by FD
-        const stdin = try INode.create(.{
-            .allocator = this.allocator,
-            .name = "stdin",
-            .serial_number = this.getSerialNum(),
-            .file_type = FileType.character_device,
-        });
-        try this.fd_table.put(0, stdin.serial_number);
-
-        const stdout = try INode.create(.{
-            .allocator = this.allocator,
-            .name = "stdin",
-            .serial_number = this.getSerialNum(),
-            .file_type = FileType.character_device,
-        });
-        try this.fd_table.put(1, stdout.serial_number);
-
-        const stderr = try INode.create(.{
-            .allocator = this.allocator,
-            .name = "stdin",
-            .serial_number = this.getSerialNum(),
-            .file_type = FileType.character_device,
-        });
-        try this.fd_table.put(2, stderr.serial_number);
-
         // create base directories
         var opts: INode.CreateArgs = .{
             .name = "tmp",
@@ -75,16 +49,46 @@ pub const FileSystemTree = struct {
             .parent = this.root,
             .allocator = this.allocator,
         };
-        try this.root.addChildINode(try INode.create(opts));
+
+        _ = try INode.create(opts);
         opts.name = "home";
         opts.serial_number = this.getSerialNum();
-        try this.root.addChildINode(try INode.create(opts));
+        _ = try INode.create(opts);
         opts.name = "bin";
         opts.serial_number = this.getSerialNum();
-        try this.root.addChildINode(try INode.create(opts));
+        _ = try INode.create(opts);
         opts.name = "dev";
         opts.serial_number = this.getSerialNum();
-        try this.root.addChildINode(try INode.create(opts));
+        _ = try INode.create(opts);
+
+        // fill fd_table with stdin, stdout, stderr
+        // stdin, stdout, and stderr are floating INodes, only accessable by FD
+        const stdin = try INode.create(.{
+            .allocator = this.allocator,
+            .name = "stdin",
+            .serial_number = this.getSerialNum(),
+            .file_type = FileType.character_device,
+            .parent = try this.getINode("/dev"),
+        });
+        try this.fd_table.put(0, stdin.serial_number);
+
+        const stdout = try INode.create(.{
+            .allocator = this.allocator,
+            .name = "stdout",
+            .serial_number = this.getSerialNum(),
+            .file_type = FileType.character_device,
+            .parent = try this.getINode("/dev"),
+        });
+        try this.fd_table.put(1, stdout.serial_number);
+
+        const stderr = try INode.create(.{
+            .allocator = this.allocator,
+            .name = "stderr",
+            .serial_number = this.getSerialNum(),
+            .file_type = FileType.character_device,
+            .parent = try this.getINode("/dev"),
+        });
+        try this.fd_table.put(2, stderr.serial_number);
 
         return this;
     }
@@ -94,51 +98,50 @@ pub const FileSystemTree = struct {
         EXCL: bool = false,
     };
 
+
     /// @param file_path: string full path to file
     /// @param flags: O_Flags
     /// @returns file descriptor
-    pub fn open(self: *FileSystemTree, file_path: []const u8, flags: O_Flags) !isize {
+    pub fn open(self: *FileSystemTree, file_path: []const u8, flags: O_Flags) !usize {
         // find next open FD
         const next_fd = for (0..std.math.maxInt(isize)) |idx| {
             if (!self.fd_table.contains(idx)) {
                 break idx;
             }
-        };
+        } else unreachable;
 
         // if file already exists, modify fd_table and return fd
-        const node = self.getINode(file_path) catch null;
-        if (node) |n| {
+        var node = self.getINode(file_path) catch null;
+        if (node != null) {
             if (flags.EXCL == true) {
                 return FileOpenError.Exist;
             }
-            try self.fd_table.put(next_fd, n.serial_number);
-            return next_fd;
+        } else {
+            if (flags.CREAT == false) {
+                return error.BAD;
+            }
+
+            try self.touch(file_path);
+            node = self.getINode(file_path) catch std.debug.panic("self.touch() failed at {any}", .{@src()});
         }
 
-        if (flags.CREAT == false) {
-            return FileOpenError;
-        }
-
-        self.touch(file_path);
+        try self.fd_table.put(next_fd, node.?.serial_number);
 
         return next_fd;
     }
 
     /// @param fd: file descriptor to close
-    /// @throws FileDescriptorError.BADFD if fd is not found in fd_table
-    pub fn close(self: *FileSystemTree, fd: usize) !void {
+    pub fn close(self: *FileSystemTree, fd: usize) void {
         if (self.fd_table.remove(fd)) {
             return;
-        } else {
-            return error.FileDescriptorError.BADFD;
         }
     }
 
     /// @param fd: file descriptor to read from
     /// @returns string data read from file
     /// @throws FileDescriptorError.BADFD if fd is not found in fd_table
-    pub fn read(self: *FileSystemTree, fd: usize) FileOpenError![]const u8 {
-        const serial = self.fd_table.get(fd) orelse return error.FileDescriptorError.BADFD;
+    pub fn read(self: *FileSystemTree, fd: usize) ![]const u8 {
+        const serial = self.fd_table.get(fd) orelse return error.BADFD;
         return self.file_data_map.get(serial) orelse unreachable;
     }
 
@@ -153,7 +156,7 @@ pub const FileSystemTree = struct {
     /// @returns number of bytes written
     /// @throws FileDescriptorError.BADFD if fd is not found in fd_table
     pub fn write(self: *FileSystemTree, fd: usize, flags: W_Flags, data: []const u8) !usize {
-        const serial = self.fd_table.get(fd) orelse return error.FileDescriptorError.BADFD;
+        const serial = self.fd_table.get(fd) orelse return error.BADFD;
 
         if (flags.TRUNC == true or flags.APPEND == false) {
             const buf = self.allocator.dupe(u8, data) catch unreachable;
@@ -175,7 +178,6 @@ pub const FileSystemTree = struct {
         }
         return data.len;
     }
-
 
     /// @return returns the INode of the file located at file_path
     /// @param file_path: string
@@ -205,6 +207,7 @@ pub const FileSystemTree = struct {
         while (value_iter.next()) |value| {
             self.allocator.free(value.*);
         }
+        self.fd_table.deinit();
         self.file_data_map.deinit();
         self.root.deallocate(self.allocator);
         self.allocator.destroy(self);
@@ -219,7 +222,6 @@ pub const FileSystemTree = struct {
     fn touch(
         self: *FileSystemTree,
         file_path: []const u8,
-        data_type: ?FileType,
     ) !void {
         const parent_directory = try self.getINode(file_path[0..std.mem.lastIndexOf(u8, file_path, "/").?]);
 
@@ -227,17 +229,43 @@ pub const FileSystemTree = struct {
             .allocator = self.allocator,
             .name = file_path[std.mem.lastIndexOf(u8, file_path, "/").? + 1 ..],
             .serial_number = self.getSerialNum(),
-            .data_type = data_type orelse FileType.binary,
             .timestamp = Timestamp.currentTime(),
             .parent = parent_directory,
+            .file_type = FileType.binary,
         });
-        try parent_directory.addChildINode(file.?);
+        try self.file_data_map.put(file.serial_number, "");
     }
 
     /// @returns serial number pre-incremented
     fn getSerialNum(self: *FileSystemTree) u64 {
         defer self.serial_number_counter += 1;
         return self.serial_number_counter;
+    }
+
+    // ---------- Debug (printing) Functions ----------
+
+    fn printFDTable(self: *FileSystemTree) void {
+        for (self.fd_table.keys()) |fd| {
+            std.debug.print("fd: {d}, serial: {d}\n", .{ fd, self.fd_table.get(fd).? });
+        }
+    }
+
+    fn printTree(self: *FileSystemTree) void {
+        printNode(self, self.root, 0);
+    }
+
+    fn printNode(self: *FileSystemTree, node: *INode, depth: u32) void {
+        const data = self.file_data_map.get(node.serial_number) orelse "";
+        for (0..depth) |_| {
+            std.debug.print("\t", .{});
+        }
+        std.debug.print("{s} ({d}): '{s}'\n", .{ node.name, node.serial_number, data });
+        if (node.children.items.len == 0) {
+            return;
+        }
+        for (node.children.items) |child| {
+            printNode(self, child, depth + 1);
+        }
     }
 };
 
@@ -252,37 +280,26 @@ test "write only" {
     var fs = try FileSystemTree.create(allocator);
     defer fs.destroy();
 
-    const bytes_written = try fs.writeByPath("/tmp/test.txt", .{ .CREAT = true }, "Hello There", .string);
+    const fd = try fs.open("/tmp/test.txt", .{ .CREAT = true });
+    defer fs.close(fd);
+
+    const bytes_written = try fs.write(fd, .{}, "Hello There");
     try std.testing.expect(bytes_written == 11);
 }
 
-test "read and write only" {
+test "read and write" {
     const allocator = std.testing.allocator;
     var fs = try FileSystemTree.create(allocator);
-
     defer fs.destroy();
 
-    const bytes_written = try fs.writeByPath("/tmp/test.txt", .{ .CREAT = true }, "Hello There", .string);
-    const bytes_read = try fs.read("/tmp/test.txt");
+    const fd = try fs.open("/tmp/test.txt", .{ .CREAT = true });
+    defer fs.close(fd);
 
-    try std.testing.expect(bytes_written == 11);
-    try std.testing.expect(std.mem.eql(u8, bytes_read, "Hello There"));
-}
+    const num_bytes_written = try fs.write(fd, .{}, "Hello There");
+    const file_data_read = try fs.read(fd);
 
-test "fuzz read and write" {
-    const Context = struct {
-        fn testOne(context: @This(), input: []const u8) anyerror!void {
-            _ = context;
-            const allocator = std.testing.allocator;
-            var fs = try FileSystemTree.create(allocator);
-            defer fs.destroy();
-
-            _ = try fs.writeByPath("/tmp/test.txt", .{ .CREAT = true }, input, .string);
-            const bytes_read = try fs.read("/tmp/test.txt");
-            try std.testing.expect(std.mem.eql(u8, bytes_read, input));
-        }
-    };
-    try std.testing.fuzz(Context{}, Context.testOne, .{});
+    try std.testing.expect(num_bytes_written == 11);
+    try std.testing.expect(std.mem.eql(u8, file_data_read, "Hello There"));
 }
 
 test "read non-existent file" {
@@ -290,13 +307,14 @@ test "read non-existent file" {
     var fs = try FileSystemTree.create(allocator);
     defer fs.destroy();
 
-    try std.testing.expectError(FileOpenError.FileNotFound, fs.read("/tmp/test.txt"));
+    try std.testing.expectError(error.BADFD, fs.read(4));
 }
 
-test "write to already existing file with EXCL flag" {
+test "open create already existing file with EXCL flag" {
     const allocator = std.testing.allocator;
     var fs = try FileSystemTree.create(allocator);
     defer fs.destroy();
-    _ = try fs.writeByPath("/tmp/test.txt", .{ .CREAT = true }, "Hello There", .string);
-    try std.testing.expectError(FileOpenError.AccessDenied, fs.writeByPath("/tmp/test.txt", .{ .EXCL = true }, "Hello There", .string));
+
+    _ = try fs.open("/tmp/test.txt", .{ .CREAT = true });
+    try std.testing.expectError(error.Exist, fs.open("/tmp/test.txt", .{ .CREAT = true, .EXCL = true }));
 }
