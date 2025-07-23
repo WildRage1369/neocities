@@ -49,7 +49,7 @@ pub const INode = struct {
 
     pub const CreateArgs = struct {
         name: []const u8,
-        serial_number: u64,
+        serial_number: usize,
         file_type: FileType,
         timestamp: ?Timestamp = null,
         owner: usize = 1,
