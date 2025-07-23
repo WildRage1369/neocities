@@ -56,7 +56,7 @@ pub const FileSystemTree = struct {
 
         // fill fd_table with stdin, stdout, stderr
         // stdin, stdout, and stderr are floating INodes, only accessable by FD
-        const outputs = [_][]const u8{"stdin", "stdout", "stderr"};
+        const outputs = [_][]const u8{ "stdin", "stdout", "stderr" };
         for (outputs, 0..) |output, i| {
             const node = INode.create(.{
                 .allocator = this.allocator,
@@ -69,7 +69,7 @@ pub const FileSystemTree = struct {
         }
 
         // create base directories
-        const children = [_][]const u8{"tmp", "home", "bin", "dev"};
+        const children = [_][]const u8{ "tmp", "home", "bin", "dev" };
         for (children) |child| {
             const node = INode.create(.{
                 .name = child,
@@ -190,8 +190,10 @@ pub const FileSystemTree = struct {
         while (value_iter.next()) |value| {
             self.allocator.free(value.*);
         }
+        for (self.inodes_list.items) |inode| {
+            inode.children.deinit();
+        }
         self.file_data_map.deinit();
-        self.root.deallocate(self.allocator);
         self.allocator.destroy(self);
     }
 
