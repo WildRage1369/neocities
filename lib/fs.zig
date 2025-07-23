@@ -22,6 +22,15 @@ pub const FileSystemTree = struct {
     serial_number_counter: usize,
     allocator: std.mem.Allocator,
 
+    pub const O_Flags = struct {
+        CREAT: bool = false,
+        EXCL: bool = false,
+    };
+    pub const W_Flags = packed struct {
+        APPEND: bool = false,
+        TRUNC: bool = false,
+    };
+
     /// Creates a new FileSystemTree (owned by the caller) and initializes it with the
     /// root directory. The root directory is owned by the FileSystemTree and will
     /// deallocate it with .destroy().
@@ -76,11 +85,6 @@ pub const FileSystemTree = struct {
         return this;
     }
 
-    pub const O_Flags = struct {
-        CREAT: bool = false,
-        EXCL: bool = false,
-    };
-
     /// @param file_path: string full path to file
     /// @param flags: O_Flags
     /// @returns file descriptor
@@ -128,11 +132,6 @@ pub const FileSystemTree = struct {
         const serial = self.fd_table.get(fd) orelse return error.FileDescriptorError.BADFD;
         return self.file_data_map.get(serial) orelse unreachable;
     }
-
-    pub const W_Flags = packed struct {
-        APPEND: bool = false,
-        TRUNC: bool = false,
-    };
 
     /// @param fd: file descriptor to write to
     /// @param flags: W_Flags
