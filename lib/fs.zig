@@ -15,12 +15,12 @@ const FileOpenError = error{
 /// file data. It is designed to be used in a WebAssembly environment.
 /// It is required to call .destroy() on it to free the memory
 pub const FileSystemTree = struct {
-    inodes_list: std.ArrayList(INode),
+    inodes_list: std.ArrayListUnmanaged(INode),
     root: usize,
-    file_data_map: std.AutoHashMap(usize, []const u8),
-    fd_table: std.AutoHashMap(usize, u64), // file descriptor -> serial number
+    file_data_map: std.AutoHashMapUnmanaged(usize, []const u8),
+    fd_table: std.AutoHashMapUnmanaged(usize, u64), // file descriptor -> serial number
     serial_number_counter: usize,
-    allocator: std.mem.Allocator,
+    alloc: std.mem.Allocator,
 
     pub const O_Flags = struct {
         CREAT: bool = false,
@@ -35,22 +35,21 @@ pub const FileSystemTree = struct {
     /// root directory. The root directory is owned by the FileSystemTree and will
     /// deallocate it with .destroy().
     pub fn create(allocator: std.mem.Allocator) !*FileSystemTree {
-        var this: *FileSystemTree = try allocator.create(FileSystemTree);
-        errdefer allocator.destroy(this);
+        var self: *FileSystemTree = try allocator.create(FileSystemTree);
+        errdefer allocator.destroy(self);
 
-        this.* = .{
-            .allocator = allocator,
-            .file_data_map = std.AutoHashMap(usize, []const u8).init(allocator),
-            .inodes_list = std.ArrayList(INode).init(allocator),
-            .fd_table = std.AutoHashMap(usize, u64).init(allocator),
+        self.* = .{
+            .alloc = allocator,
+            .file_data_map = std.AutoHashMapUnmanaged(usize, []const u8){},
+            .inodes_list = std.ArrayListUnmanaged(INode){},
+            .fd_table = std.AutoHashMapUnmanaged(usize, u64){},
             .serial_number_counter = 0,
-            .root = this.getSerialNum(),
+            .root = self.getSerialNum(),
         };
 
-        try this.inodes_list.append(INode.create(.{
-            .allocator = this.allocator,
+        try self.inodes_list.append(self.alloc, INode.create(.{
             .name = "/",
-            .serial_number = this.root,
+            .serial_number = self.root,
             .file_type = FileType.directory,
         }));
 
@@ -59,13 +58,12 @@ pub const FileSystemTree = struct {
         const outputs = [_][]const u8{ "stdin", "stdout", "stderr" };
         for (outputs, 0..) |output, i| {
             const node = INode.create(.{
-                .allocator = this.allocator,
                 .name = output,
-                .serial_number = this.getSerialNum(),
+                .serial_number = self.getSerialNum(),
                 .file_type = FileType.character_device,
             });
-            try this.inodes_list.append(node);
-            try this.fd_table.put(i, node.serial_number);
+            try self.inodes_list.append(self.alloc, node);
+            try self.fd_table.put(self.alloc, i, node.serial_number);
         }
 
         // create base directories
@@ -73,16 +71,15 @@ pub const FileSystemTree = struct {
         for (children) |child| {
             const node = INode.create(.{
                 .name = child,
-                .serial_number = this.getSerialNum(),
+                .serial_number = self.getSerialNum(),
                 .file_type = FileType.directory,
-                .parent = this.root,
-                .allocator = this.allocator,
+                .parent = self.root,
             });
-            try this.inodes_list.append(node);
-            try this.addChildINode(this.root, node.serial_number);
+            try self.inodes_list.append(self.alloc, node);
+            try self.addChildINode(self.root, node.serial_number);
         }
 
-        return this;
+        return self;
     }
 
     /// @param file_path: string full path to file
@@ -102,12 +99,12 @@ pub const FileSystemTree = struct {
             if (flags.EXCL == true) {
                 return FileOpenError.Exist;
             }
-            try self.fd_table.put(next_fd, n.serial_number);
+            try self.fd_table.put(self.alloc, next_fd, n.serial_number);
         } else if (flags.CREAT == false) {
             return FileOpenError.FileNotFound;
         } else {
             const serial = try self.touch(file_path);
-            try self.fd_table.put(next_fd, serial);
+            try self.fd_table.put(self.alloc, next_fd, serial);
         }
 
         return next_fd;
@@ -138,19 +135,19 @@ pub const FileSystemTree = struct {
         const serial = self.fd_table.get(fd) orelse return error.BADFD;
 
         if (flags.TRUNC == true or flags.APPEND == false) {
-            const buf = self.allocator.dupe(u8, data) catch unreachable;
-            try self.file_data_map.put(serial, buf);
+            const buf = self.alloc.dupe(u8, data) catch unreachable;
+            try self.file_data_map.put(self.alloc, serial, buf);
         } else if (flags.APPEND == true) {
             const old_data = self.file_data_map.get(serial);
             if (old_data) |old| {
-                var buf = self.allocator.alloc(u8, old.len + data.len + 1) catch unreachable;
+                var buf = self.alloc.alloc(u8, old.len + data.len + 1) catch unreachable;
                 std.mem.copyForwards(u8, buf, old);
                 std.mem.copyForwards(u8, buf[old.len..], data);
                 buf[data.len + old.len] = 0;
-                try self.file_data_map.put(serial, buf);
+                try self.file_data_map.put(self.alloc, serial, buf);
             } else {
-                const buf = self.allocator.dupe(u8, data) catch unreachable;
-                try self.file_data_map.put(serial, buf);
+                const buf = self.alloc.dupe(u8, data) catch unreachable;
+                try self.file_data_map.put(self.alloc, serial, buf);
             }
         } else {
             return 0;
@@ -184,15 +181,15 @@ pub const FileSystemTree = struct {
     pub fn destroy(self: *FileSystemTree) void {
         var value_iter = self.file_data_map.valueIterator();
         while (value_iter.next()) |value| {
-            self.allocator.free(value.*);
+            self.alloc.free(value.*);
         }
-        for (self.inodes_list.items) |inode| {
-            inode.children.deinit();
+        for (self.inodes_list.items) |*inode| {
+            inode.children.deinit(self.alloc);
         }
-        self.inodes_list.deinit();
-        self.fd_table.deinit();
-        self.file_data_map.deinit();
-        self.allocator.destroy(self);
+        self.inodes_list.deinit(self.alloc);
+        self.fd_table.deinit(self.alloc);
+        self.file_data_map.deinit(self.alloc);
+        self.alloc.destroy(self);
     }
 
     // ---------- INode Functions ----------
@@ -207,7 +204,7 @@ pub const FileSystemTree = struct {
     /// @brief Add a child INode to this INode and update input INode. Ownership of input INode is transferred to this INode
     /// @param child: INode to add to this INode's children and to be owned by this INode
     pub fn addChildINode(self: *FileSystemTree, parent: usize, child: usize) !void {
-        try self.get(parent).children.append(child);
+        try self.get(parent).children.append(self.alloc, child);
         self.get(child).parent = parent;
     }
 
@@ -234,14 +231,13 @@ pub const FileSystemTree = struct {
         const parent_directory = try self.getByPath(file_path[0..std.mem.lastIndexOf(u8, file_path, "/").?]);
 
         const file = INode.create(.{
-            .allocator = self.allocator,
             .name = file_path[std.mem.lastIndexOf(u8, file_path, "/").? + 1 ..],
             .file_type = .string,
             .serial_number = self.getSerialNum(),
             .timestamp = Timestamp.currentTime(),
             .parent = parent_directory.serial_number,
         });
-        try self.inodes_list.append(file);
+        try self.inodes_list.append(self.alloc, file);
         try self.addChildINode(parent_directory.serial_number, file.serial_number);
         return file.serial_number;
     }

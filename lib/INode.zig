@@ -30,7 +30,7 @@ pub const INode = struct {
     owner: usize, // user id
     timestamp: Timestamp, // Timestamp object with ctime, mtime, atime
     size: u64,
-    children: std.ArrayList(usize),
+    children: std.ArrayListUnmanaged(usize),
     parent: usize,
 
     pub fn create(options: INode.CreateArgs) INode {
@@ -42,13 +42,12 @@ pub const INode = struct {
             .owner = options.owner,
             .timestamp = options.timestamp orelse Timestamp.currentTime(),
             .size = options.size orelse 0,
-            .children = options.children orelse std.ArrayList(usize).init(options.allocator),
+            .children = options.children orelse std.ArrayListUnmanaged(usize){},
             .parent = options.parent orelse options.serial_number,
         };
     }
 
     pub const CreateArgs = struct {
-        allocator: std.mem.Allocator,
         name: []const u8,
         serial_number: u64,
         file_type: FileType,
@@ -56,15 +55,13 @@ pub const INode = struct {
         owner: usize = 1,
         file_mode: u16 = 0o755,
         size: ?u64 = null,
-        children: ?std.ArrayList(usize) = null,
+        children: ?std.ArrayListUnmanaged(usize) = null,
         parent: ?usize = null,
     };
 };
 
 test INode {
-    const allocator = std.testing.allocator;
     _ = INode.create(.{
-        .allocator = allocator,
         .name = "test",
         .serial_number = 1,
         .file_type = FileType.directory,
