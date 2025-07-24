@@ -11,8 +11,8 @@ const FileType = @import("INode.zig").FileType;
 pub const FileSystemTree = struct {
     _inode_list: std.ArrayListUnmanaged(INode),
     _root: usize,
-    _data_map: std.AutoHashMapUnmanaged(usize, []const u8),
-    _fd_table: std.AutoHashMapUnmanaged(usize, u64), // file descriptor -> serial number
+    _data_map: std.AutoHashMapUnmanaged(usize, []u8),
+    _fd_table: std.AutoHashMapUnmanaged(usize, usize), // file descriptor -> serial number
     _serial_number_counter: usize,
     _alloc: std.mem.Allocator,
 
@@ -34,9 +34,9 @@ pub const FileSystemTree = struct {
 
         self.* = .{
             ._alloc = allocator,
-            ._data_map = std.AutoHashMapUnmanaged(usize, []const u8){},
+            ._data_map = std.AutoHashMapUnmanaged(usize, []u8){},
             ._inode_list = std.ArrayListUnmanaged(INode){},
-            ._fd_table = std.AutoHashMapUnmanaged(usize, u64){},
+            ._fd_table = std.AutoHashMapUnmanaged(usize, usize){},
             ._serial_number_counter = 0,
             ._root = self.getSerialNum(),
         };
@@ -113,7 +113,7 @@ pub const FileSystemTree = struct {
 
     /// Reads the file located at the file descriptor and returns the data.
     /// Returns error.BADFD if the file descriptor is not found in the fd_table.
-    pub fn read(self: *FileSystemTree, fd: usize) ![]const u8 {
+    pub fn read(self: *FileSystemTree, fd: usize) ![] u8 {
         const serial = self._fd_table.get(fd) orelse return error.BADFD;
         return self._data_map.get(serial) orelse unreachable;
     }

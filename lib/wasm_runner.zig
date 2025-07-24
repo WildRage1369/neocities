@@ -42,13 +42,6 @@ var filesys: *FileSystemTree = undefined;
 
 // start wasm string functions
 
-// EXTERNAL: allocates memory for a string
-export fn allocString(len: usize) [*]u8 {
-    const arr = wasm_alloc.alloc(u8, len + 1) catch panic("allocString() failed", @src());
-    if (comptime builtin.target.cpu.arch == .wasm32) logStr("allocString() done".ptr);
-    return arr.ptr;
-}
-
 // INTERNAL: converts a wasm string pointer to a Zig string
 fn readString(ptr: [*:0]u8) []const u8 {
     const str: []const u8 = std.mem.span(ptr);
@@ -56,7 +49,12 @@ fn readString(ptr: [*:0]u8) []const u8 {
     return str;
 }
 
-// start OS functions
+// EXTERNAL: allocates memory for a string
+export fn allocString(len: usize) [*]u8 {
+    const arr = wasm_alloc.alloc(u8, len + 1) catch panic("allocString() failed", @src());
+    // if (comptime builtin.target.cpu.arch == .wasm32) logStr("allocString() done".ptr);
+    return arr.ptr;
+}
 
 // EXTERNAL: initializes the file system
 export fn init() void {
@@ -65,7 +63,18 @@ export fn init() void {
 }
 
 // EXTERNAL: opens a file and returns a serial number
-export fn open(path_ptr: [*:0]u8) u64 {
+export fn open(path_ptr: [*:0]u8) u32 {
     const path = readString(path_ptr);
-    return (filesys.getINode(path) catch panic("FileSystemTree.getINode() failed", @src())).serial_number;
+    return (filesys.open(path, .{ .CREAT = true }) catch panic("FileSystemTree.open() failed", @src()));
+}
+
+// EXTERNAL: write data to fd
+export fn write(fd: u32, path_ptr: [*:0]u8) u32 {
+    return filesys.write(fd, .{}, readString(path_ptr)) catch 0;
+}
+
+// EXTERNAL: read data from fd
+export fn read(fd: u32) [*]u8 {
+    const data: []u8 = filesys.read(fd) catch "";
+    return data.ptr;
 }
