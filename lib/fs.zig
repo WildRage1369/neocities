@@ -166,14 +166,14 @@ pub const FileSystemTree = struct {
 
     /// @brief Add a child INode to this INode and update input INode. Ownership of input INode is transferred to this INode
     /// @param child: INode to add to this INode's children and to be owned by this INode
-    pub fn addChildINode(self: *FileSystemTree, parent: usize, child: usize) !void {
+    fn addChildINode(self: *FileSystemTree, parent: usize, child: usize) !void {
         try self.getBySerial(parent).children.append(self._alloc, child);
         self.getBySerial(child).parent = parent;
     }
 
     /// @brief Add a list of children INodes to this INode
     /// @param new_children: ArrayList of INodes to add to this INode's children
-    pub fn addChildArrayList(self: *FileSystemTree, parent: usize, new_children: *std.ArrayList(usize)) !void {
+    fn addChildArrayList(self: *FileSystemTree, parent: usize, new_children: *std.ArrayList(usize)) !void {
         const child_slice = try new_children.toOwnedSlice();
         try self.getBySerial(parent).children.appendSlice(child_slice);
         for (child_slice) |child| {
