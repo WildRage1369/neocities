@@ -113,7 +113,7 @@ pub const FileSystemTree = struct {
 
     /// Reads the file located at the file descriptor and returns the data.
     /// Returns error.BADFD if the file descriptor is not found in the fd_table.
-    pub fn read(self: *FileSystemTree, fd: usize) ![] u8 {
+    pub fn read(self: *FileSystemTree, fd: usize) ![]u8 {
         const serial = self._fd_table.get(fd) orelse return error.BADFD;
         return self._data_map.get(serial) orelse unreachable;
     }
@@ -161,6 +161,39 @@ pub const FileSystemTree = struct {
         self._data_map.deinit(self._alloc);
         self._alloc.destroy(self);
     }
+
+    pub fn getcwd(self: *FileSystemTree, wd_fd: usize) ![]u8 {
+        var curr_node = self._fd_table.get(wd_fd) orelse return error.BADFD;
+        var buf: [1024]u8 = undefined;
+        var idx: usize = 0;
+        while (curr_node != self._root) {
+            const node = self.getBySerial(curr_node);
+            std.mem.copyForwards(u8, buf[idx..], node.name);
+            idx += node.name.len + 1;
+            buf[idx - 1] = '~';
+            curr_node = node.parent;
+        }
+        buf[idx - 1] = 0;
+        var itr = std.mem.splitBackwardsSequence(u8, buf[0..idx], "~");
+        // test case: "/home/natural/"
+
+        var ret: []u8 = try self._alloc.alloc(u8, idx);
+        idx = 1;
+        ret[0] = '/';
+        while (itr.next()) |s| {
+            std.mem.copyForwards(u8, ret[idx..], s);
+            idx += s.len;
+            ret[idx-1] = '/';
+        }
+        ret[idx - 1] = '/';
+        return ret;
+    }
+
+
+    // pub fn readdir(self: *FileSystemTree, fd: usize) ![]usize {
+    //     const serial = self._fd_table.get(fd) orelse return error.BADFD;
+    //
+    // }
 
     // ---------- INode Functions ----------
 
@@ -327,4 +360,17 @@ test "open already existing file with EXCL flag" {
 
     const err = fs.open("/tmp/test.txt", .{ .EXCL = true, .CREAT = true });
     try std.testing.expectError(error.FileExists, err);
+}
+
+test "getcwd" {
+    const allocator = std.testing.allocator;
+    var fs = try FileSystemTree.create(allocator);
+    defer fs.destroy();
+
+    const fd = try fs.open("/home/natural/", .{ .CREAT = true, .EXCL = true });
+    defer fs.close(fd);
+
+    const res = try fs.getcwd(fd);
+    defer allocator.free(res);
+    try std.testing.expectEqualStrings("/home/natural/", res);
 }
