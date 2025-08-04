@@ -222,11 +222,27 @@ pub const FileSystemTree = struct {
         self: *FileSystemTree,
         file_path: []const u8,
     ) !usize {
-        const parent_directory = try self.getByPath(file_path[0..std.mem.lastIndexOf(u8, file_path, "/").?]);
+        var ft: FileType = .string;
+        var loc = std.mem.lastIndexOf(u8, file_path, "/");
+        if (loc == file_path.len - 1) {
+            loc = std.mem.lastIndexOf(u8, file_path[0 .. file_path.len - 1], "/");
+            ft = .directory;
+        }
+        if (loc == null) {
+            return error.DirectoryNotFound;
+        }
+        const parent_directory = try self.getByPath(file_path[0..loc.?]);
+
+        var idx: usize = 0;
+        if (ft != .directory) {
+            idx = std.mem.lastIndexOf(u8, file_path, "/").? + 1;
+        } else {
+            idx = std.mem.lastIndexOf(u8, file_path[0 .. file_path.len - 1], "/").? + 1;
+        }
 
         const file = INode.create(.{
-            .name = file_path[std.mem.lastIndexOf(u8, file_path, "/").? + 1 ..],
-            .file_type = .string,
+            .name = file_path[idx..],
+            .file_type = ft,
             .serial_number = self.getSerialNum(),
             .timestamp = Timestamp.currentTime(),
             .parent = parent_directory.serial_number,
@@ -254,13 +270,13 @@ pub const FileSystemTree = struct {
 
         // iterate through input path
         while (input_path_itr.next()) |next_node_name| {
-
             // get next node or error if not found
             const next_node: usize = for (self.getBySerial(current_node).children.items) |child_node| {
                 if (std.mem.eql(u8, self.getBySerial(child_node).name, next_node_name)) {
                     break child_node;
                 }
-            } else return error.FileNotFound;
+                // } else panic("FileSystemTree.getByPath() failed, directory not found\n", .{});
+            } else return error.DirectoryNotFound;
 
             current_node = next_node;
         }
