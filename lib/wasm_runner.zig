@@ -23,6 +23,27 @@ fn panic(msg: []const u8, e: anyerror, src: std.builtin.SourceLocation) noreturn
     @trap();
 }
 
+fn panicWithMsg(comptime msg: []const u8, args: anytype, e: anyerror, src: std.builtin.SourceLocation) noreturn {
+    var buf: [1024:0]u8 = undefined;
+    var idx: usize = 0;
+    const message = std.fmt.bufPrint(buf[0..], msg, args) catch unreachable;
+    std.mem.copyForwards(u8, buf[idx..], message);
+    idx += message.len;
+
+    const s = std.fmt.bufPrint(buf[idx..], "\n\t{any}\n\t{s}:{any}:{any} at {s}()", .{
+        e,
+        src.file,
+        src.line,
+        src.column,
+        src.fn_name,
+    }) catch unreachable;
+    idx += s.len;
+
+    buf[idx + 1] = 0;
+    if (comptime builtin.target.cpu.arch == .wasm32) logErr(buf[0..idx :0]);
+    @trap();
+}
+
 const wasm_alloc = if (builtin.target.cpu.arch == .wasm32) std.heap.wasm_allocator else std.testing.allocator;
 
 var filesys: *FileSystemTree = undefined;
@@ -30,6 +51,7 @@ var filesys: *FileSystemTree = undefined;
 // start wasm string functions
 
 // INTERNAL: converts a wasm string pointer to a Zig string
+//           Frees the WASM memory after use
 fn readString(ptr: [*:0]u8) []const u8 {
     const str: []const u8 = std.mem.span(ptr);
     defer wasm_alloc.free(str);
@@ -62,7 +84,7 @@ export fn open(path_ptr: [*:0]u8, flags: u8) u32 {
         else => {},
     }
     const path = readString(path_ptr);
-    return (filesys.open(path, f) catch |e| panic("open() failed", e, @src()));
+    return (filesys.open(path, f) catch |e| panicWithMsg("open() with input: '{s}'", .{path}, e, @src()));
 }
 
 // EXTERNAL: write data to fd
@@ -72,12 +94,18 @@ export fn write(fd: u32, path_ptr: [*:0]u8) u32 {
 
 // EXTERNAL: read data from fd
 export fn read(fd: u32) [*]u8 {
-    const data: []u8 = filesys.read(fd) catch |e| panic("read() failed", e, @src());
+    const data: []u8 = filesys.read(fd) catch |e| panicWithMsg("read() failed with input {d}", .{fd},  e, @src());
     return data.ptr;
 }
 
 // EXTERNAL: get current working directory
 export fn getcwd(fd: u32) [*]u8 {
-    const data: []u8 = filesys.getcwd(fd) catch |e| panic("getcwd() failed", e, @src());
+    const data: []u8 = filesys.getStringPath(fd) catch |e| panic("getcwd() failed", e, @src());
     return data.ptr;
+}
+
+// EXTERNAL: free memory
+export fn freeString(ptr: [*]u8, len: u32) void {
+    logNum(1);
+    filesys.freeString(ptr[0..len]);
 }

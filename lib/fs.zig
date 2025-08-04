@@ -189,6 +189,10 @@ pub const FileSystemTree = struct {
         return ret;
     }
 
+    pub fn freeString(self: *FileSystemTree, ptr: []u8) void {
+        self._alloc.free(ptr);
+    }
+
 
     // pub fn readdir(self: *FileSystemTree, fd: usize) ![]usize {
     //     const serial = self._fd_table.get(fd) orelse return error.BADFD;
