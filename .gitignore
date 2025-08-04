@@ -3,3 +3,4 @@ Session.vim
 node_modules/
 libraries/.zig-cache
 lib/.zig-cache
+lib/zig-out/docs

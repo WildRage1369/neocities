@@ -162,7 +162,7 @@ pub const FileSystemTree = struct {
         self._alloc.destroy(self);
     }
 
-    pub fn getcwd(self: *FileSystemTree, wd_fd: usize) ![]u8 {
+    pub fn getStringPath(self: *FileSystemTree, wd_fd: usize) ![]u8 {
         var curr_node = self._fd_table.get(wd_fd) orelse return error.BADFD;
         var buf: [1024]u8 = undefined;
         var idx: usize = 0;
@@ -386,7 +386,7 @@ test "getcwd" {
     const fd = try fs.open("/home/natural/", .{ .CREAT = true, .EXCL = true });
     defer fs.close(fd);
 
-    const res = try fs.getcwd(fd);
+    const res = try fs.getStringPath(fd);
     defer allocator.free(res);
     try std.testing.expectEqualStrings("/home/natural/", res);
 }
