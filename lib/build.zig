@@ -2,6 +2,7 @@ const std = @import("std");
 
 pub fn build(b: *std.Build) void {
     b.exe_dir = ""; // output wasm files to root (./lib/)
+    b.lib_dir = "";
 
     // build wasm file with `zig build`
     const wasm = b.addExecutable(.{
@@ -30,4 +31,20 @@ pub fn build(b: *std.Build) void {
 
     test_step.dependOn(&inode_tests.step);
     test_step.dependOn(&fs_tests.step);
+
+    // build docs with `zig build docs`
+    const fs = b.addStaticLibrary(.{
+        .name = "fs",
+        .root_source_file = b.path("fs.zig"),
+        .target = b.graph.host,
+        .optimize = std.builtin.OptimizeMode.ReleaseSmall,
+    });
+    const docs_step = b.step("docs", "Generate documentation");
+    const lib_docs = b.addInstallDirectory(.{
+        .source_dir = fs.getEmittedDocs(),
+        .install_subdir = "",
+        .install_dir = .{ .custom = "docs" },
+    });
+    docs_step.dependOn(&lib_docs.step);
+
 }
