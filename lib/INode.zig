@@ -16,7 +16,6 @@ pub const Timestamp = struct {
 
 pub const FileType = enum {
     directory,
-    executable,
     string,
     binary,
     character_device,
@@ -50,7 +49,7 @@ pub const INode = struct {
     pub const CreateArgs = struct {
         name: []const u8,
         serial_number: usize,
-        file_type: FileType,
+        file_type: FileType = .binary,
         timestamp: ?Timestamp = null,
         owner: usize = 1,
         file_mode: u16 = 0o755,
@@ -64,7 +63,5 @@ test INode {
     _ = INode.create(.{
         .name = "test",
         .serial_number = 1,
-        .file_type = FileType.directory,
-        .timestamp = Timestamp.currentTime(),
     });
 }

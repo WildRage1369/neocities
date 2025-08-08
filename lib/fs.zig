@@ -242,7 +242,7 @@ pub const FileSystemTree = struct {
         self: *FileSystemTree,
         file_path: []const u8,
     ) !usize {
-        var ft: FileType = .string;
+        var ft: FileType = .binary;
         var loc = std.mem.lastIndexOf(u8, file_path, "/");
         if (loc == file_path.len - 1) {
             loc = std.mem.lastIndexOf(u8, file_path[0 .. file_path.len - 1], "/");
