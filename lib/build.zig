@@ -6,15 +6,15 @@ pub fn build(b: *std.Build) void {
 
     // build wasm file with `zig build`
     const wasm = b.addExecutable(.{
-        .name = "wasm_runner",
-        .root_source_file = b.path("wasm_runner.zig"),
+        .name = "wasm",
+        .root_source_file = b.path("wasm.zig"),
         .target = b.resolveTargetQuery(.{ .cpu_arch = .wasm32, .os_tag = .freestanding }),
         .optimize = std.builtin.OptimizeMode.ReleaseSmall,
     });
 
     wasm.entry = .disabled;
     wasm.rdynamic = true;
-    wasm.root_module.export_symbol_names = &.{ "init", "open", "write", "allocString"};
+    wasm.root_module.export_symbol_names = &.{ "init", "open", "write", "allocString", "close"};
     b.installArtifact(wasm);
 
     // run tests with `zig build test` or `zig build test --summary all`

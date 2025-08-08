@@ -100,7 +100,7 @@ export fn read(fd: u32) [*]u8 {
 
 // EXTERNAL: get current working directory
 export fn getcwd(fd: u32) [*]u8 {
-    const data: []u8 = filesys.getStringPath(fd) catch |e| panic("getcwd() failed", e, @src());
+    const data: []u8 = filesys.getStringPath(fd) catch |e| panicWithMsg("getcwd() failed with input {d}", .{fd}, e, @src());
     return data.ptr;
 }
 
@@ -108,4 +108,9 @@ export fn getcwd(fd: u32) [*]u8 {
 export fn freeString(ptr: [*]u8, len: u32) void {
     logNum(1);
     filesys.freeString(ptr[0..len]);
+}
+
+// EXTERNAL: close file descriptor
+export fn close(fd: u32) void {
+    filesys.close(fd);
 }

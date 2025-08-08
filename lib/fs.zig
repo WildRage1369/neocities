@@ -115,6 +115,23 @@ pub const FileSystemTree = struct {
     /// Returns error.BADFD if the file descriptor is not found in the fd_table.
     pub fn read(self: *FileSystemTree, fd: usize) ![]u8 {
         const serial = self._fd_table.get(fd) orelse return error.BADFD;
+        const node = self.getBySerial(serial);
+        if (node.file_type == .directory) {
+            var size_to_alloc: usize = 0;
+            for (node.children.items) |child_serial| {
+                const child = self.getBySerial(child_serial);
+                size_to_alloc += child.name.len + 1;
+            }
+            var buf = try self._alloc.alloc(u8, size_to_alloc);
+            var idx: usize = 0;
+            for (node.children.items) |child_serial| {
+                const child = self.getBySerial(child_serial);
+                std.mem.copyForwards(u8, buf[idx..], child.name);
+                buf[idx + child.name.len] = '\n';
+                idx += child.name.len + 1;
+            }
+            return buf[0..idx];
+        }
         return self._data_map.get(serial) orelse unreachable;
     }
 
@@ -183,7 +200,7 @@ pub const FileSystemTree = struct {
         while (itr.next()) |s| {
             std.mem.copyForwards(u8, ret[idx..], s);
             idx += s.len;
-            ret[idx-1] = '/';
+            ret[idx - 1] = '/';
         }
         ret[idx - 1] = '/';
         return ret;
@@ -192,7 +209,6 @@ pub const FileSystemTree = struct {
     pub fn freeString(self: *FileSystemTree, ptr: []u8) void {
         self._alloc.free(ptr);
     }
-
 
     // pub fn readdir(self: *FileSystemTree, fd: usize) ![]usize {
     //     const serial = self._fd_table.get(fd) orelse return error.BADFD;
@@ -276,6 +292,9 @@ pub const FileSystemTree = struct {
         while (input_path_itr.next()) |next_node_name| {
             // get next node or error if not found
             const next_node: usize = for (self.getBySerial(current_node).children.items) |child_node| {
+            if (std.mem.eql(u8, next_node_name, "")) {
+                break child_node;
+            }
                 if (std.mem.eql(u8, self.getBySerial(child_node).name, next_node_name)) {
                     break child_node;
                 }
@@ -299,6 +318,23 @@ pub const FileSystemTree = struct {
 
     // ---------- Print Debug Functions ---------
 
+    pub fn stringFDTable(self: *FileSystemTree) ![*:0]usize {
+        const buf = try self._alloc.alloc(usize, self._fd_table.count() * 100);
+        var it = self._fd_table.iterator();
+        var i: usize = 0;
+        while (it.next()) |entry| {
+            buf[i] = entry.key_ptr.*;
+            buf[i+1] = entry.value_ptr.*;
+            // _ = std.fmt.bufPrint(
+            //     buf[i ..],
+            //     "{d}: {d}\n",
+            //     .{ entry.key_ptr.*, entry.value_ptr.* },
+            // ) catch unreachable;
+            i += 3;
+        }
+        buf[99] = 0;
+        return buf[0..100:0];
+    }
     /// Prints the contents of the fd_table in the format "fd: serial_number"
     fn printFDTable(self: *FileSystemTree) void {
         var it = self._fd_table.iterator();
@@ -393,4 +429,8 @@ test "getcwd" {
     const res = try fs.getStringPath(fd);
     defer allocator.free(res);
     try std.testing.expectEqualStrings("/home/natural/", res);
+
+    const fd2 = try fs.open("/home/", .{ });
+    defer fs.close(fd2);
+    fs.printFDTable();
 }
