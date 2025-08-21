@@ -14,7 +14,6 @@ pub fn build(b: *std.Build) void {
 
     wasm.entry = .disabled;
     wasm.rdynamic = true;
-    wasm.root_module.export_symbol_names = &.{ "init", "open", "write", "allocString", "close"};
     b.installArtifact(wasm);
 
     // run tests with `zig build test` or `zig build test --summary all`
