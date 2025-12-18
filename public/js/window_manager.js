@@ -1,3 +1,4 @@
+import { pointerToString } from "/kernel_loader.js";
 var runningWindows = {};
 var next_wid = 1;
 var wid = 0;
@@ -24,8 +25,147 @@ $(document).on("mouseup", () => {
 	mouseUp = true;
 });
 
-function insertWindow(dirname) {
-	let dim = [$(document).width(), $(document).height()];
+export function insert(wid, content) {
+    console.log("insert running with wid: " + wid);
+    let data = pointerToString(content)
+    console.log(data);
+    $(runningWindows[wid].jqWin).children(".inner-window").append(data);
+}
+
+export function insertFile(wid, file_path) {
+    console.log("insertFile running with wid: " + wid);
+    let path = pointerToString(file_path)
+    console.log(path)
+    fetch(path).then(response => response.text()).then(data => {
+        $(runningWindows[wid].jqWin).children(".inner-window").append(data);
+    });
+}
+
+// Creates window and returns wid (handle for later use)
+export function createWindow(title, basename, width, height, x, y) {
+	title = pointerToString(title);
+	basename = pointerToString(basename);
+
+	const dim = [$(document).width(), $(document).height()];
+
+	wid = next_wid++; // get the window ID for the new window
+
+	const window_html = `
+        <div class="window ${basename}-win" id="win-${wid}" style="width: ${width}px; height: ${height}px;">
+            <div class="title-bar">
+                <div class="title-bar-text unselectable">${title}</div>
+                <div class="title-bar-controls">
+                    <button id="min-${wid}" aria-label="Minimize"></button>
+                    <button id="cls-${wid}" aria-label="Close"></button>
+                </div>
+            </div>
+            <div class="inner-window"></div>
+        </div>`;
+	// <button id=taskbar-${dirname} type="button" class="window-button">
+	const taskbar_html = `
+        <button id="bar-${wid}" type="button" class="window-button taskbar-button">
+        <p id="par-${wid}" class="button-text">${title}</p>
+        </button>`;
+
+	runningWindows[wid] = {
+		wid: wid,
+		basename: basename,
+		visible: true,
+		down: false,
+		offset: [0, 0],
+		z_index: 1,
+		jqWin: $(window_html).appendTo($(".container"))[0],
+		jqBarButton: $(taskbar_html).appendTo($("#taskbar-left"))[0],
+	};
+	const win = runningWindows[wid];
+
+	// increment the z-indeces of all windows and redistribute
+	Object.keys(runningWindows).forEach((key) => {
+		if (key != wid) {
+			runningWindows[key].z_index++;
+		}
+	});
+	redistribute();
+
+	// --------- setup taskbar button ----------
+
+	// add taskbar button minimizing and focusing capabilites
+	$(":button[id='bar-" + wid + "']").on("click", () => {
+		if (win.z_index == 1) {
+			// if win is selected (requires window to be visible)
+			win.visible = false;
+			$(win.jqWin).toggle();
+			toBack(win.wid);
+		} else if (win.visible) {
+			// if win is visble but not selected
+			toFront(win.wid);
+		} else {
+			// if win is hidden
+			win.visible = true;
+			$(win.jqWin).toggle();
+			toFront(win.wid);
+		}
+	});
+
+	// --------- setup window ----------
+
+	// minimize button (window)
+	$(":button[id='min-" + wid + "']").on("click", () => {
+		win.visible = false;
+		$(win.jqWin).toggle();
+		toBack(win.wid);
+	});
+
+	// close button (window)
+	$(":button[id='cls-" + wid + "']").on("click", () => {
+		$(win.jqWin).remove();
+		$(win.jqBarButton).remove();
+		delete runningWindows[win.wid];
+	});
+
+	// ---- setup window moving -----
+
+	// (mousedown event) move window to front and setup window moving
+	$(win.jqWin)
+		.contents()
+		.on("mousedown", (event) => {
+			win.down = true;
+			win.offset = [
+				(win.offset.x = event.clientX - parseInt($(win.jqWin).css("left"))),
+				(win.offset.y = event.clientY - parseInt($(win.jqWin).css("top"))),
+			];
+			toFront(win.wid);
+		});
+
+	// (mousemove event) move window relative to original position
+	$(win.jqWin)
+		.contents()
+		.on("mousemove", (event) => {
+			if (win.down) {
+				$(win.jqWin).css("left", event.pageX - win.offset[0]);
+				$(win.jqWin).css("top", event.pageY - win.offset[1]);
+			}
+		});
+
+	// (mouseup event) reset window moving variable
+	$(win.jqWin)
+		.contents()
+		.on("mouseup", () => {
+			win.down = "";
+		});
+
+	// (on load) set the position to the correct coords
+    $(win.jqWin).css("left", x);
+    $(win.jqWin).css("top", y);
+
+	// return the cursor to normal
+	parent.document.body.style.cursor = "auto";
+	return wid;
+}
+
+
+// DEPRICATED
+export function insertWindow(dirname) {
 	// set the cursor to wait to let the user know that their input was registered
 	// parent.document.body.style.cursor = "wait";
 	// document.body.style.cursor = "wait";
@@ -304,17 +444,3 @@ function changeWin() {
 	}
 	setTimeout(resizeIframeDefault, 100);
 }
-
-$(document).ready(() => {
-	insertWindow("abtme");
-	insertWindow("clock");
-	insertWindow("pictures");
-	setTimeout(() => {
-		$(".abtme-win").css("left", "60vw");
-		$(".abtme-win").css("top", "10vh");
-		$(".clock-win").css("left", "15vw");
-		$(".clock-win").css("top", "15vh");
-		$(".pictures-win").css("left", "40vw");
-		$(".pictures-win").css("top", "40vh");
-	}, 200);
-});

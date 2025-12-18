@@ -129,11 +129,11 @@ img {
 }
 
 .window {
-    top:9999px;
-    left:9999px;
+    /* top:9999px; */
+    /* left:9999px; */
     height: max-content;
-    min-height: 25px;
-    min-width: 250px;
+    /* min-height: 25px; */
+    /* min-width: 150px; */
     position: absolute;
     overflow: hidden;
     resize: both;
@@ -143,6 +143,17 @@ img {
 .window::-webkit-scrollbar {
     width: 0px;
     background: transparent; /* make scrollbar transparent */
+}
+
+.window-new {
+    height: max-content;
+    min-height: 25px;
+    min-width: 250px;
+    position: absolute;
+    overflow: hidden;
+    resize: both;
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
 }
 
 .title-bar {

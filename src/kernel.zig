@@ -1,10 +1,31 @@
 const std = @import("std");
 const builtin = @import("builtin");
-const FileSystemTree = @import("fs.zig").FileSystemTree;
+const FileSystemTree = @import("FileSystemTree.zig");
 
 extern fn logNum(data: u32) void;
 extern fn logStr(ptr: [*:0]const u8) void;
 extern fn logErr(ptr: [*:0]const u8) void;
+extern fn createWindow(title: [*:0]const u8, basename: [*:0]const u8, width: u32, height: u32, x: u32, y: u32) u32;
+extern fn insert(wid: u32, content: [*:0]const u8) void;
+extern fn loadProgram(name: [*:0]const u8) void;
+
+
+// ---------- Kernel init Syscalls ----------
+
+var filesys: *FileSystemTree = undefined;
+
+// kernel.start() is called by the kernel loader
+export fn start() void {
+    filesys = fs_init();
+    if (comptime builtin.target.cpu.arch == .wasm32) logStr("kernel.fs_init() done".ptr);
+
+    const wid = createWindow("N@castle", "test", 150, 150, 50, 50);
+    insert(wid, "<h1>Hello World!</h1>");
+
+    loadProgram("about_me");
+}
+
+// ---------- Panic Syscalls ----------
 
 fn panic(msg: []const u8, e: anyerror, src: std.builtin.SourceLocation) noreturn {
     var buf: [1024:0]u8 = undefined;
@@ -46,15 +67,13 @@ fn panicWithMsg(comptime msg: []const u8, args: anytype, e: anyerror, src: std.b
 
 const wasm_alloc = if (builtin.target.cpu.arch == .wasm32) std.heap.wasm_allocator else std.testing.allocator;
 
-var filesys: *FileSystemTree = undefined;
 
-// start wasm string functions
+// ---------- WASM String Syscalls ----------
 
 // INTERNAL: converts a wasm string pointer to a Zig string
-//           Frees the WASM memory after use
+// TODO: deallocate string at some point
 fn readString(ptr: [*:0]u8) []const u8 {
     const str: []const u8 = std.mem.span(ptr);
-    defer wasm_alloc.free(str);
     return str;
 }
 
@@ -65,10 +84,18 @@ export fn allocString(len: usize) [*]u8 {
     return arr.ptr;
 }
 
-// EXTERNAL: initializes the file system
-export fn init() void {
-    filesys = FileSystemTree.create(wasm_alloc) catch |e| panic("FileSystemTree.create() failed", e, @src());
-    if (comptime builtin.target.cpu.arch == .wasm32) logStr("init() done".ptr);
+// EXTERNAL: free memory
+export fn freeString(ptr: [*]u8, len: u32) void {
+    // logNum(1);
+    filesys.freeString(ptr[0..len]);
+}
+
+
+// ---------- Filesystem Syscalls ----------
+
+// INTERNAL: initializes the file system
+fn fs_init() *FileSystemTree {
+    return FileSystemTree.create(wasm_alloc) catch |e| panic("FileSystemTree.create() failed", e, @src());
 }
 
 // EXTERNAL: opens a file and returns a serial number
@@ -83,6 +110,7 @@ export fn open(path_ptr: [*:0]u8, flags: u8) u32 {
         },
         else => {},
     }
+    logStr(path_ptr);
     const path = readString(path_ptr);
     return (filesys.open(path, f) catch |e| panicWithMsg("open() with input: '{s}'", .{path}, e, @src()));
 }
@@ -101,16 +129,15 @@ export fn read(fd: u32) [*]u8 {
 // EXTERNAL: get current working directory
 export fn getcwd(fd: u32) [*]u8 {
     const data: []u8 = filesys.getStringPath(fd) catch |e| panicWithMsg("getcwd() failed with input {d}", .{fd}, e, @src());
+    // logNum(data.len);
     return data.ptr;
 }
 
-// EXTERNAL: free memory
-export fn freeString(ptr: [*]u8, len: u32) void {
-    logNum(1);
-    filesys.freeString(ptr[0..len]);
-}
 
 // EXTERNAL: close file descriptor
 export fn close(fd: u32) void {
     filesys.close(fd);
 }
+
+// export const ls = @import("programs/ls.zig").ls;
+// export const about_me = @import("programs/about_me.zig").about_me;

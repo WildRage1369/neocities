@@ -1,6 +1,6 @@
 var exports = {};
 exports.start = start;
-import * as wasm from "./wasm.js";
+// import * as wasm from "./wasm.js";
 
 const O_flags = {
 	CREAT: 0b01,
@@ -8,61 +8,62 @@ const O_flags = {
 };
 
 export function start() {
-	var cwd_fd = wasm.open("/home/natural/", O_flags.CREAT);
-	var cwd_string = normalizePath(wasm.getcwd(cwd_fd));
-	var prompt = "N@castle:" + cwd_string + "$ ";
-	var restricted_text = prompt;
-	const commands = new Map([
-		["echo", echo],
-		["printf", printf],
-		["pwd", pwd],
-		["clear", clear],
-		[ "cd", cd ],
-		// [ "exit", exit ],
-	]);
-
-	$("textarea").on("input", function () {
-		let val = String($(this).val());
-		if (val.indexOf(restricted_text) == -1) {
-			$(this).val(restricted_text);
-		}
-		// If the user has pressed enter
-		if (val.charCodeAt(val.length - 1) == 10) {
-			let args = parse_cmdline(
-				val.slice(val.lastIndexOf(prompt) + prompt.length).trimEnd(),
-			);
-			if (args[0] == pwd) args[1] = cwd_fd; // special case for pwd
-
-			try {
-                // special case for cwd as it needs to update variables
-				if (args[0] == "cd") {
-                    return_args = cd(args, cwd_fd, cwd_string);
-                    cwd_fd = return_args[0];
-                    cwd_string = return_args[1];
-                    prompt = "N@castle:" + cwd_string + "$ ";
-				} else {
-                    // call function with name args[0] and arguments args
-                    commands.get(args[0])(args);
-                }
-			} catch (e) {
-				if (e) {
-					println(e);
-                    throw e;
-				} else {
-					println(args[0] + ": command not found");
-				}
-			}
-
-			// print prompt (special case for "clear")
-			if (args[0] == "clear") {
-				print(prompt);
-			} else {
-				print("\n" + prompt);
-			}
-
-			restricted_text = $(this).val();
-		}
-	});
+	// var cwd_fd = wasm.open("/home/natural/", O_flags.CREAT);
+	// var cwd_string = normalizePath(wasm.getcwd(cwd_fd));
+	// var prompt = "N@castle:" + cwd_string + "$ ";
+	// var restricted_text = prompt;
+	// const commands = new Map([
+	// 	["echo", echo],
+	// 	["printf", printf],
+	// 	["pwd", pwd],
+	// 	["clear", clear],
+	// 	[ "cd", cd ],
+	// 	// [ "exit", exit ],
+	// ]);
+	//
+	// $("textarea").on("input", function () {
+	// 	let val = String($(this).val());
+	// 	if (val.indexOf(restricted_text) == -1) {
+	// 		$(this).val(restricted_text);
+	// 	}
+	// 	// If the user has pressed enter
+	// 	if (val.charCodeAt(val.length - 1) == 10) {
+	// 		let args = parse_cmdline(
+	// 			val.slice(val.lastIndexOf(prompt) + prompt.length).trimEnd(),
+	// 		);
+	// 		if (args[0] == pwd) args[1] = cwd_fd; // special case for pwd
+	//
+	// 		try {
+	//                // special case for cwd as it needs to update variables
+	// 			if (args[0] == "cd") {
+	//                    let return_args = cd(args, cwd_fd, cwd_string);
+	//                    cwd_fd = return_args[0];
+	//                    cwd_string = return_args[1];
+	//                    prompt = "N@castle:" + cwd_string + "$ ";
+	// 			} else {
+	//                    // call function with name args[0] and arguments args
+	//                    commands.get(args[0])(args);
+	//                }
+	// 		} catch (e) {
+	// 			if (e) {
+	// 				println(e);
+	//                    console.log(e)
+	//                    // throw e;
+	// 			} else {
+	// 				println(args[0] + ": command not found");
+	// 			}
+	// 		}
+	//
+	// 		// print prompt (special case for "clear")
+	// 		if (args[0] == "clear") {
+	// 			print(prompt);
+	// 		} else {
+	// 			print("\n" + prompt);
+	// 		}
+	//
+	// 		restricted_text = $(this).val();
+	// 	}
+	// });
 }
 
 // API INFO (i = in progress, x = done)
@@ -117,7 +118,7 @@ function printf(args) {
 function cd(args, original_fd, cwd_string) {
     let new_fd = original_fd;
 	// if there is 1 arg
-	if (args[1] && !args[2]) {
+	if (args[1] != null && args[2] == null) {
 		// if command is "cd .."
 		if (args[1] == "..") {
             new_fd = wasm.open(cwd_string.slice(0, cwd_string.lastIndexOf("/"), 0));
@@ -132,11 +133,13 @@ function cd(args, original_fd, cwd_string) {
             }
         }
 	} else if (!args[1]) {
+        wasm.close(original_fd);
+        new_fd = wasm.open("/home/natural/");
 		// if "cd" is ran by itself
 		cwd = "~";
 	} else {
 		// if there are too many commands
-		println("Too many args for cd command");
+		printf("Too many args for cd command\n");
         return [original_fd, cwd_string];
 	}
     wasm.close(original_fd);
@@ -144,6 +147,9 @@ function cd(args, original_fd, cwd_string) {
 }
 
 function pwd(args) {
+    if (!args[1]) { 
+        throw "pwd: missing operand";
+    }
 	println(wasm.getcwd(args[1]));
 }
 
