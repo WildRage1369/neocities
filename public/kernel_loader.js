@@ -1,12 +1,15 @@
 import { createWindow, insert, insertFile } from "./js/window_manager.js";
+import { ProcessTree } from "./js/process_tree.js";
 var exports = {};
 exports.kernel = kernel;
 exports.programs = programs;
+exports.processTree = processTree;
 
 var wasm_instance; // inited in runWasm
 var freeString;
 export var kernel = {};
 export var programs = {};
+export var processTree;
 
 function stringToPointer(str) {
 	const buffer = new TextEncoder().encode(str);
@@ -27,10 +30,26 @@ export function pointerToString(ptr) {
 	// get len of string
 	let ptr_cpy = ptr;
 	let len = 0;
-	while (view[ptr_cpy] != 0) {
+	while (view[ptr_cpy] != 0 && len < 99999) {
 		len++;
 		ptr_cpy++;
 	}
+    if (len == 99999) { return "ERROR: string too long"; }
+	let str = utf8Decoder.decode(view.slice(ptr, ptr + len));
+	return str;
+}
+
+export function procPointerToString(pid, ptr) {
+	let utf8Decoder = new TextDecoder();
+	let view = new Uint8Array(processTree.get(pid).memory.buffer);
+	// get len of string
+	let ptr_cpy = ptr;
+	let len = 0;
+	while (view[ptr_cpy] != 0 && len < 99999) {
+		len++;
+		ptr_cpy++;
+	}
+    if (len == 99999) { return "ERROR: string tooo long"; }
 	let str = utf8Decoder.decode(view.slice(ptr, ptr + len));
 	return str;
 }
@@ -71,9 +90,10 @@ const importFunctions = {
 				fetch("/programs/" + program_name + ".zig.wasm"),
 				importFunctions,
 			).then((wasm) => {
+                let pid = processTree.addProcess(program_name, 1, 1, wasm.instance.exports.memory);
 				programs[program_name] = wasm.instance.exports["main"];
-				console.log("program loaded: " + program_name);
-				programs[program_name]();
+				console.log("program loaded: " + program_name + " " + pid);
+				programs[program_name](pid);
 			});
 		},
 	},
@@ -86,6 +106,7 @@ WebAssembly.instantiateStreaming(fetch("/kernel.wasm"), importFunctions).then(
 		}
 		wasm_instance = wasm;
 
+        processTree = new ProcessTree(wasm.instance.exports.memory);
 		kernel.start();
 	},
 );

@@ -1,9 +1,9 @@
-import { pointerToString } from "/kernel_loader.js";
+import { procPointerToString, pointerToString} from "/kernel_loader.js";
 var runningWindows = {};
 var next_wid = 1;
 var wid = 0;
 var mouseUp = true;
-var mousePosition;
+// var mousePosition;
 var titles = [
 	["abtme", "About Me :3"],
 	["abtsite", "About My Site!"],
@@ -28,25 +28,22 @@ $(document).on("mouseup", () => {
 export function insert(wid, content) {
     console.log("insert running with wid: " + wid);
     let data = pointerToString(content)
-    console.log(data);
     $(runningWindows[wid].jqWin).children(".inner-window").append(data);
 }
 
-export function insertFile(wid, file_path) {
-    console.log("insertFile running with wid: " + wid);
-    let path = pointerToString(file_path)
-    console.log(path)
+export function insertFile(pid, wid, file_path) {
+    let path = procPointerToString(pid,file_path)
     fetch(path).then(response => response.text()).then(data => {
         $(runningWindows[wid].jqWin).children(".inner-window").append(data);
     });
 }
 
 // Creates window and returns wid (handle for later use)
-export function createWindow(title, basename, width, height, x, y) {
-	title = pointerToString(title);
-	basename = pointerToString(basename);
+export function createWindow(pid, title, basename, width, height, x, y) {
+	title = procPointerToString(pid, title);
+	basename = procPointerToString(pid, basename);
 
-	const dim = [$(document).width(), $(document).height()];
+	// const dim = [$(document).width(), $(document).height()];
 
 	wid = next_wid++; // get the window ID for the new window
 

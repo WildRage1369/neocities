@@ -5,7 +5,7 @@ const FileSystemTree = @import("FileSystemTree.zig");
 extern fn logNum(data: u32) void;
 extern fn logStr(ptr: [*:0]const u8) void;
 extern fn logErr(ptr: [*:0]const u8) void;
-extern fn createWindow(title: [*:0]const u8, basename: [*:0]const u8, width: u32, height: u32, x: u32, y: u32) u32;
+extern fn createWindow(pid: u32, title: [*:0]const u8, basename: [*:0]const u8, width: u32, height: u32, x: u32, y: u32) u32;
 extern fn insert(wid: u32, content: [*:0]const u8) void;
 extern fn loadProgram(name: [*:0]const u8) void;
 
@@ -19,7 +19,7 @@ export fn start() void {
     filesys = fs_init();
     if (comptime builtin.target.cpu.arch == .wasm32) logStr("kernel.fs_init() done".ptr);
 
-    const wid = createWindow("N@castle", "test", 150, 150, 50, 50);
+    const wid = createWindow(1, "N@castle", "test", 150, 150, 50, 50);
     insert(wid, "<h1>Hello World!</h1>");
 
     loadProgram("about_me");
@@ -86,8 +86,8 @@ export fn allocString(len: usize) [*]u8 {
 
 // EXTERNAL: free memory
 export fn freeString(ptr: [*]u8, len: u32) void {
-    // logNum(1);
-    filesys.freeString(ptr[0..len]);
+    // filesys.freeString(ptr[0..len]);
+    wasm_alloc.free(ptr[0..len]);
 }
 
 
